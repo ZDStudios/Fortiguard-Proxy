@@ -23,12 +23,20 @@ def _get_base_dir() -> Path:
         # Compiled EXE: extract bundled files to %APPDATA%\FortiProxy
         work = Path(os.environ.get("APPDATA", Path.home())) / "FortiProxy"
         work.mkdir(exist_ok=True)
-        src_root = Path(sys._MEIPASS)
+        src = Path(sys._MEIPASS)
+
+        # Copy flat files (always refresh so updates apply)
         for fname in ("client.js", "proxy.pac", "package.json"):
-            src = src_root / fname
-            dst = work / fname
-            if src.exists():
-                shutil.copy2(src, dst)
+            s = src / fname
+            if s.exists():
+                shutil.copy2(s, work / fname)
+
+        # Copy bundled node_modules/ws if not already extracted
+        src_ws = src / "node_modules" / "ws"
+        dst_ws = work / "node_modules" / "ws"
+        if src_ws.exists() and not dst_ws.exists():
+            shutil.copytree(src_ws, dst_ws)
+
         return work
     else:
         # Running as script: client/ is one level up from app/
@@ -248,9 +256,13 @@ class App(ctk.CTk):
 
             ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
             if not ws_pkg.exists():
-                self._tlog("Installing dependencies...", "info")
-                r = subprocess.run(["npm", "install"], cwd=str(BASE_DIR),
-                                   capture_output=True, text=True)
+                if getattr(sys, "frozen", False):
+                    self._tlog("ws module missing from bundle — please rebuild EXE", "error")
+                    self.after(0, self._reset_ui)
+                    return
+                self._tlog("Installing dependencies (one-time)...", "info")
+                r = subprocess.run("npm install", cwd=str(BASE_DIR),
+                                   shell=True, capture_output=True, text=True)
                 if r.returncode != 0:
                     self._tlog(f"npm install failed: {r.stderr.strip()}", "error")
                     self.after(0, self._reset_ui)
