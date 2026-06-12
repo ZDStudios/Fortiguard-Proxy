@@ -15,6 +15,15 @@ function openControl() {
 
   ws.on("open", () => {
     console.log("[FortiProxy] Control channel connected");
+    // Ping every 20s — Render kills idle WebSockets after 30s
+    const ping = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      } else {
+        clearInterval(ping);
+      }
+    }, 20000);
+    ws.once("close", () => clearInterval(ping));
   });
 
   ws.on("message", (data) => {
