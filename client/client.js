@@ -2,11 +2,46 @@ const net      = require("net");
 const os       = require("os");
 const WebSocket = require("ws");
 
-const SERVER  = "wss://fortiguard-proxy.onrender.com";
-const TOKEN   = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
-const DEVICE  = os.hostname();
+const SERVER     = "wss://fortiguard-proxy.onrender.com";
+const TOKEN      = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
+const DEVICE     = os.hostname();
 const LOCAL_PORT = 8080;
 
+// ── Control channel ────────────────────────────────────────────────────────────
+// Persistent WebSocket for receiving admin commands (block/unblock).
+function openControl() {
+  const url = `${SERVER}/control?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
+  const ws  = new WebSocket(url, { rejectUnauthorized: false });
+
+  ws.on("open", () => {
+    console.log("[FortiProxy] Control channel connected");
+  });
+
+  ws.on("message", (data) => {
+    try {
+      const msg = JSON.parse(data.toString());
+      if (msg.cmd === "block") {
+        console.log("[FortiProxy] Blocked by server admin");
+        // Special line dashboard.py looks for to show the blocked status
+        console.log("FORTIPROXY_CMD:block");
+        setTimeout(() => process.exit(0), 150);
+      } else if (msg.cmd === "unblock") {
+        console.log("[FortiProxy] Unblocked by server admin");
+        console.log("FORTIPROXY_CMD:unblock");
+      }
+    } catch {}
+  });
+
+  ws.on("error", () => {});
+  ws.on("close", () => {
+    // Reconnect after 5 seconds (unless we're shutting down)
+    setTimeout(openControl, 5000);
+  });
+}
+
+openControl();
+
+// ── Tunnel proxy ───────────────────────────────────────────────────────────────
 const proxy = net.createServer((client) => {
   const headerChunks = [];
   let   headerDone   = false;

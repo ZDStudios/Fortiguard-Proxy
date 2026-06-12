@@ -60,6 +60,7 @@ class App(ctk.CTk):
         self._pulse_job  = None
         self._pulse_on   = False
         self._closing    = False
+        self._blocked    = False
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -286,7 +287,12 @@ class App(ctk.CTk):
                 self.after(0, self._on_connected)
                 for line in self._proc.stdout:
                     line = line.strip()
-                    if line:
+                    if not line:
+                        continue
+                    if line.startswith("FORTIPROXY_CMD:"):
+                        cmd = line.split(":", 1)[1]
+                        self.after(0, lambda c=cmd: self._handle_server_cmd(c))
+                    else:
                         self._tlog(line, "info")
                 self._proc.wait()
                 self.after(0, self._on_disconnected)
@@ -315,15 +321,27 @@ class App(ctk.CTk):
         self._tick_uptime()
         self._pulse()
 
+    def _handle_server_cmd(self, cmd):
+        if cmd == "block":
+            self._blocked = True
+            self._log("Blocked by server admin — proxy disabled", "error")
+            self._disable_proxy()
+            self._tunnel_dot.configure(text="● BLOCKED", text_color="#ff3355")
+        elif cmd == "unblock":
+            self._blocked = False
+            self._log("Unblocked by server admin", "ok")
+
     def _on_disconnected(self):
         self._connected = False
         if self._pulse_job:
             self.after_cancel(self._pulse_job)
             self._pulse_job = None
         self._disable_proxy()
-        self._tunnel_dot.configure(text="● OFFLINE",  text_color="#2a2a44")
-        self._uptime_lbl.configure(text="--:--:--",         text_color="#2a2a44")
-        self._log("Disconnected — proxy disabled", "warn")
+        if not self._blocked:
+            self._tunnel_dot.configure(text="● OFFLINE", text_color="#2a2a44")
+            self._log("Disconnected — proxy disabled", "warn")
+        self._uptime_lbl.configure(text="--:--:--", text_color="#2a2a44")
+        self._blocked = False
         self._reset_ui()
 
     def _reset_ui(self):
