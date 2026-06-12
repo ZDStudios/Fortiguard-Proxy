@@ -1,0 +1,363 @@
+import customtkinter as ctk
+import subprocess
+import threading
+import winreg
+import urllib.request
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+BASE_DIR  = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+REG_PATH  = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+SERVER    = "https://fortiguard-proxy.onrender.com"
+
+
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("FortiProxy")
+        self.geometry("580x580")
+        self.resizable(False, False)
+        self.configure(fg_color="#08080f")
+
+        self._proc        = None
+        self._connected   = False
+        self._start_time  = None
+        self._pulse_job   = None
+        self._pulse_on    = False
+
+        self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._log("Dashboard ready", "dim")
+        self._ping_server()
+
+    # ── UI ────────────────────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        # ── header bar ────────────────────────────────────────────────────────
+        hdr = ctk.CTkFrame(self, fg_color="#04040c", corner_radius=0, height=60)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+
+        ctk.CTkLabel(
+            hdr, text="  🛡  FORTIPROXY",
+            font=ctk.CTkFont("Consolas", 21, "bold"),
+            text_color="#00d4ff",
+        ).pack(side="left", padx=20)
+
+        self._refresh_btn = ctk.CTkButton(
+            hdr, text="↻", width=34, height=34,
+            font=ctk.CTkFont("Consolas", 16),
+            fg_color="#151528", hover_color="#1f1f3a",
+            corner_radius=8, command=self._ping_server,
+        )
+        self._refresh_btn.pack(side="right", padx=14)
+
+        ctk.CTkLabel(
+            hdr, text="v2.0  ",
+            font=ctk.CTkFont("Consolas", 11),
+            text_color="#22223a",
+        ).pack(side="right")
+
+        # ── status card ───────────────────────────────────────────────────────
+        card = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
+        card.pack(fill="x", padx=18, pady=(14, 6))
+
+        self._server_dot = self._status_row(card, "RENDER SERVER", "● CHECKING", "#ffaa00")
+        self._sep(card)
+        self._tunnel_dot = self._status_row(card, "TUNNEL",        "● OFFLINE",  "#2a2a44")
+        self._sep(card)
+        self._uptime_lbl = self._status_row(card, "UPTIME",        "--:--:--",   "#2a2a44",
+                                             bold=False)
+
+        # ── buttons ───────────────────────────────────────────────────────────
+        bf = ctk.CTkFrame(self, fg_color="transparent")
+        bf.pack(fill="x", padx=18, pady=8)
+        bf.columnconfigure((0, 1), weight=1)
+
+        self._start_btn = ctk.CTkButton(
+            bf, text="▶   START", height=52, corner_radius=10,
+            font=ctk.CTkFont("Consolas", 14, "bold"),
+            fg_color="#005c2e", hover_color="#008040",
+            command=self._start,
+        )
+        self._start_btn.grid(row=0, column=0, padx=(0, 7), sticky="ew")
+
+        self._stop_btn = ctk.CTkButton(
+            bf, text="■   DISCONNECT", height=52, corner_radius=10,
+            font=ctk.CTkFont("Consolas", 14, "bold"),
+            fg_color="#1a1a2e", hover_color="#1a1a2e",
+            state="disabled", command=self._stop,
+        )
+        self._stop_btn.grid(row=0, column=1, padx=(7, 0), sticky="ew")
+
+        # ── log panel ─────────────────────────────────────────────────────────
+        lf = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
+        lf.pack(fill="both", expand=True, padx=18, pady=(6, 16))
+
+        top = ctk.CTkFrame(lf, fg_color="transparent")
+        top.pack(fill="x", padx=14, pady=(10, 2))
+
+        ctk.CTkLabel(
+            top, text="ACTIVITY LOG",
+            font=ctk.CTkFont("Consolas", 10),
+            text_color="#22223a",
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            top, text="clear", width=42, height=20,
+            font=ctk.CTkFont("Consolas", 10),
+            fg_color="transparent", hover_color="#141428",
+            text_color="#333355", command=self._clear_log,
+        ).pack(side="right")
+
+        self._logbox = ctk.CTkTextbox(
+            lf,
+            font=ctk.CTkFont("Consolas", 11),
+            fg_color="#06060e",
+            text_color="#00ff88",
+            corner_radius=10,
+            state="disabled",
+            wrap="word",
+        )
+        self._logbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        tb = self._logbox._textbox
+        tb.tag_config("ok",    foreground="#00ff88")
+        tb.tag_config("dim",   foreground="#333355")
+        tb.tag_config("info",  foreground="#aaaacc")
+        tb.tag_config("warn",  foreground="#ffaa00")
+        tb.tag_config("error", foreground="#ff3355")
+
+    def _status_row(self, parent, label, value, color, bold=True):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=18, pady=8)
+
+        ctk.CTkLabel(
+            row, text=label,
+            font=ctk.CTkFont("Consolas", 11),
+            text_color="#333355", width=140, anchor="w",
+        ).pack(side="left")
+
+        lbl = ctk.CTkLabel(
+            row, text=value,
+            font=ctk.CTkFont("Consolas", 11, "bold" if bold else "normal"),
+            text_color=color,
+        )
+        lbl.pack(side="right")
+        return lbl
+
+    def _sep(self, parent):
+        ctk.CTkFrame(parent, fg_color="#151528", height=1, corner_radius=0).pack(
+            fill="x", padx=16
+        )
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    def _log(self, msg, style="ok"):
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._logbox.configure(state="normal")
+        tb = self._logbox._textbox
+        tb.insert("end", f"[{ts}]  ", "dim")
+        tb.insert("end", f"{msg}\n", style)
+        tb.see("end")
+        self._logbox.configure(state="disabled")
+
+    def _tlog(self, msg, style="ok"):
+        """Thread-safe log."""
+        self.after(0, lambda: self._log(msg, style))
+
+    def _clear_log(self):
+        self._logbox.configure(state="normal")
+        self._logbox.delete("1.0", "end")
+        self._logbox.configure(state="disabled")
+
+    # ── Server ping ───────────────────────────────────────────────────────────
+
+    def _ping_server(self):
+        self._server_dot.configure(text="● CHECKING", text_color="#ffaa00")
+        self._refresh_btn.configure(state="disabled")
+        self._tlog("Pinging Render server...", "dim")
+
+        def _check():
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
+                    timeout=12,
+                )
+                self.after(0, lambda: self._server_dot.configure(
+                    text="● ONLINE", text_color="#00ff88"))
+                self._tlog("Render server is online", "ok")
+            except Exception as e:
+                self.after(0, lambda: self._server_dot.configure(
+                    text="● OFFLINE", text_color="#ff3355"))
+                self._tlog(f"Server unreachable — {e}", "warn")
+            finally:
+                self.after(0, lambda: self._refresh_btn.configure(state="normal"))
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    # ── Proxy registry ────────────────────────────────────────────────────────
+
+    def _enable_proxy(self):
+        pac_url = (BASE_DIR / "proxy.pac").as_uri()
+        try:
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
+            winreg.SetValueEx(k, "AutoConfigURL", 0, winreg.REG_SZ,    pac_url)
+            winreg.SetValueEx(k, "ProxyEnable",   0, winreg.REG_DWORD, 1)
+            try:
+                winreg.DeleteValue(k, "ProxyServer")
+            except OSError:
+                pass
+            winreg.CloseKey(k)
+            return True
+        except Exception as e:
+            self._tlog(f"Failed to enable proxy: {e}", "error")
+            return False
+
+    def _disable_proxy(self):
+        try:
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
+            winreg.SetValueEx(k, "ProxyEnable", 0, winreg.REG_DWORD, 0)
+            try:
+                winreg.DeleteValue(k, "AutoConfigURL")
+            except OSError:
+                pass
+            winreg.CloseKey(k)
+        except Exception as e:
+            self._tlog(f"Failed to disable proxy: {e}", "error")
+
+    # ── Start / Stop ──────────────────────────────────────────────────────────
+
+    def _start(self):
+        self._start_btn.configure(state="disabled", text="  CONNECTING...")
+        self._tunnel_dot.configure(text="● CONNECTING", text_color="#ffaa00")
+
+        def _run():
+            # ping
+            self._tlog("Checking server...", "dim")
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
+                    timeout=12,
+                )
+                self._tlog("Server online", "ok")
+            except Exception as e:
+                self._tlog(f"Server ping failed ({e}) — trying anyway", "warn")
+
+            # deps
+            ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
+            if not ws_pkg.exists():
+                self._tlog("Installing dependencies...", "info")
+                r = subprocess.run(
+                    ["npm", "install"],
+                    cwd=str(BASE_DIR),
+                    capture_output=True, text=True,
+                )
+                if r.returncode != 0:
+                    self._tlog(f"npm install failed:\n{r.stderr.strip()}", "error")
+                    self.after(0, self._reset_ui)
+                    return
+                self._tlog("Dependencies installed", "ok")
+
+            # proxy
+            if not self._enable_proxy():
+                self.after(0, self._reset_ui)
+                return
+            self._tlog("System proxy enabled (PAC)", "ok")
+
+            # node
+            try:
+                self._proc = subprocess.Popen(
+                    ["node", str(BASE_DIR / "client.js")],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True, bufsize=1,
+                    cwd=str(BASE_DIR),
+                )
+                self.after(0, self._on_connected)
+                for line in self._proc.stdout:
+                    line = line.strip()
+                    if line:
+                        self._tlog(line, "info")
+                self._proc.wait()
+                self.after(0, self._on_disconnected)
+            except FileNotFoundError:
+                self._tlog("node.exe not found — install Node.js from nodejs.org", "error")
+                self.after(0, self._reset_ui)
+            except Exception as e:
+                self._tlog(f"Unexpected error: {e}", "error")
+                self.after(0, self._reset_ui)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _stop(self):
+        self._tlog("Disconnecting...", "warn")
+        self._stop_btn.configure(state="disabled")
+        if self._proc:
+            self._proc.terminate()
+
+    def _on_connected(self):
+        self._connected   = True
+        self._start_time  = time.time()
+        self._tunnel_dot.configure(text="● CONNECTED", text_color="#00ff88")
+        self._stop_btn.configure(
+            state="normal", fg_color="#5c0000", hover_color="#880000"
+        )
+        self._log("Tunnel active — traffic routed through Render", "ok")
+        self._tick_uptime()
+        self._pulse()
+
+    def _on_disconnected(self):
+        self._connected = False
+        if self._pulse_job:
+            self.after_cancel(self._pulse_job)
+            self._pulse_job = None
+        self._disable_proxy()
+        self._tunnel_dot.configure(text="● OFFLINE",  text_color="#2a2a44")
+        self._uptime_lbl.configure(text="--:--:--",  text_color="#2a2a44")
+        self._log("Disconnected — proxy disabled", "warn")
+        self._reset_ui()
+
+    def _reset_ui(self):
+        self._start_btn.configure(state="normal", text="▶   START")
+        self._stop_btn.configure(
+            state="disabled", fg_color="#1a1a2e", hover_color="#1a1a2e"
+        )
+
+    # ── Uptime + pulse ────────────────────────────────────────────────────────
+
+    def _tick_uptime(self):
+        if not self._connected:
+            return
+        s = int(time.time() - self._start_time)
+        self._uptime_lbl.configure(
+            text=f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}",
+            text_color="#00d4ff",
+        )
+        self.after(1000, self._tick_uptime)
+
+    def _pulse(self):
+        if not self._connected:
+            return
+        self._pulse_on = not self._pulse_on
+        self._tunnel_dot.configure(
+            text_color="#00ff88" if self._pulse_on else "#006633"
+        )
+        self._pulse_job = self.after(900, self._pulse)
+
+    # ── Close ─────────────────────────────────────────────────────────────────
+
+    def _on_close(self):
+        if self._proc:
+            self._proc.terminate()
+        self._disable_proxy()
+        self.destroy()
+
+
+if __name__ == "__main__":
+    App().mainloop()
