@@ -29,6 +29,7 @@ class App(ctk.CTk):
         self._start_time  = None
         self._pulse_job   = None
         self._pulse_on    = False
+        self._closing     = False
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -168,8 +169,9 @@ class App(ctk.CTk):
         self._logbox.configure(state="disabled")
 
     def _tlog(self, msg, style="ok"):
-        """Thread-safe log."""
-        self.after(0, lambda: self._log(msg, style))
+        """Thread-safe log — safe to call after window is closed."""
+        if not self._closing:
+            self.after(0, lambda: self._log(msg, style))
 
     def _clear_log(self):
         self._logbox.configure(state="normal")
@@ -353,6 +355,10 @@ class App(ctk.CTk):
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def _on_close(self):
+        self._closing = True
+        self._connected = False          # stop pulse / uptime ticks
+        if self._pulse_job:
+            self.after_cancel(self._pulse_job)
         if self._proc:
             self._proc.terminate()
         self._disable_proxy()
