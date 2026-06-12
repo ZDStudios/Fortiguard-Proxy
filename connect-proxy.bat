@@ -4,7 +4,7 @@
 ::  Edit PROXY_HOST and PROXY_TOKEN before first use.
 :: ============================================================
 
-set PROXY_HOST=YOUR-APP-NAME.onrender.com
+set PROXY_HOST=fortiguard-proxy.onrender.com
 set PROXY_PORT=443
 set PROXY_TOKEN=YOUR_SECRET_TOKEN
 
