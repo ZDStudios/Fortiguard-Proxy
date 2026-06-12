@@ -1,0 +1,12 @@
+{
+  "name": "fortiguard-proxy",
+  "version": "1.0.0",
+  "description": "HTTP/HTTPS forward proxy for Render",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

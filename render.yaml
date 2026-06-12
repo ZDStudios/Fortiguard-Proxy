@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: fortiguard-proxy
+    runtime: node
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: PROXY_TOKEN
+        sync: false
