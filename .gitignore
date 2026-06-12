@@ -1,2 +1,7 @@
 node_modules/
 .env
+FortiProxy.exe
+__pycache__/
+*.pyc
+app/build/
+app/FortiProxy.spec

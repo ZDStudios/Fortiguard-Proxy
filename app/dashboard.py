@@ -3,7 +3,9 @@ import subprocess
 import threading
 import winreg
 import urllib.request
+import os
 import sys
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -11,9 +13,29 @@ from pathlib import Path
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-BASE_DIR  = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-REG_PATH  = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-SERVER    = "https://fortiguard-proxy.onrender.com"
+REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+SERVER   = "https://fortiguard-proxy.onrender.com"
+
+
+def _get_base_dir() -> Path:
+    """Return directory containing client.js, proxy.pac, package.json."""
+    if getattr(sys, "frozen", False):
+        # Compiled EXE: extract bundled files to %APPDATA%\FortiProxy
+        work = Path(os.environ.get("APPDATA", Path.home())) / "FortiProxy"
+        work.mkdir(exist_ok=True)
+        src_root = Path(sys._MEIPASS)
+        for fname in ("client.js", "proxy.pac", "package.json"):
+            src = src_root / fname
+            dst = work / fname
+            if src.exists():
+                shutil.copy2(src, dst)
+        return work
+    else:
+        # Running as script: client/ is one level up from app/
+        client_dir = Path(__file__).parent.parent / "client"
+        return client_dir if client_dir.exists() else Path(__file__).parent
+
+BASE_DIR = _get_base_dir()
 
 
 class App(ctk.CTk):
@@ -24,12 +46,12 @@ class App(ctk.CTk):
         self.resizable(False, False)
         self.configure(fg_color="#08080f")
 
-        self._proc        = None
-        self._connected   = False
-        self._start_time  = None
-        self._pulse_job   = None
-        self._pulse_on    = False
-        self._closing     = False
+        self._proc       = None
+        self._connected  = False
+        self._start_time = None
+        self._pulse_job  = None
+        self._pulse_on   = False
+        self._closing    = False
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -39,13 +61,12 @@ class App(ctk.CTk):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
-        # ── header bar ────────────────────────────────────────────────────────
         hdr = ctk.CTkFrame(self, fg_color="#04040c", corner_radius=0, height=60)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
         ctk.CTkLabel(
-            hdr, text="  🛡  FORTIPROXY",
+            hdr, text="  \U0001f6e1  FORTIPROXY",
             font=ctk.CTkFont("Consolas", 21, "bold"),
             text_color="#00d4ff",
         ).pack(side="left", padx=20)
@@ -64,18 +85,15 @@ class App(ctk.CTk):
             text_color="#22223a",
         ).pack(side="right")
 
-        # ── status card ───────────────────────────────────────────────────────
         card = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
         card.pack(fill="x", padx=18, pady=(14, 6))
 
-        self._server_dot = self._status_row(card, "RENDER SERVER", "● CHECKING", "#ffaa00")
+        self._server_dot = self._srow(card, "RENDER SERVER", "● CHECKING", "#ffaa00")
         self._sep(card)
-        self._tunnel_dot = self._status_row(card, "TUNNEL",        "● OFFLINE",  "#2a2a44")
+        self._tunnel_dot = self._srow(card, "TUNNEL",        "● OFFLINE",  "#2a2a44")
         self._sep(card)
-        self._uptime_lbl = self._status_row(card, "UPTIME",        "--:--:--",   "#2a2a44",
-                                             bold=False)
+        self._uptime_lbl = self._srow(card, "UPTIME",        "--:--:--",        "#2a2a44", bold=False)
 
-        # ── buttons ───────────────────────────────────────────────────────────
         bf = ctk.CTkFrame(self, fg_color="transparent")
         bf.pack(fill="x", padx=18, pady=8)
         bf.columnconfigure((0, 1), weight=1)
@@ -96,34 +114,24 @@ class App(ctk.CTk):
         )
         self._stop_btn.grid(row=0, column=1, padx=(7, 0), sticky="ew")
 
-        # ── log panel ─────────────────────────────────────────────────────────
         lf = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
         lf.pack(fill="both", expand=True, padx=18, pady=(6, 16))
 
         top = ctk.CTkFrame(lf, fg_color="transparent")
         top.pack(fill="x", padx=14, pady=(10, 2))
-
-        ctk.CTkLabel(
-            top, text="ACTIVITY LOG",
-            font=ctk.CTkFont("Consolas", 10),
-            text_color="#22223a",
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            top, text="clear", width=42, height=20,
-            font=ctk.CTkFont("Consolas", 10),
-            fg_color="transparent", hover_color="#141428",
-            text_color="#333355", command=self._clear_log,
-        ).pack(side="right")
+        ctk.CTkLabel(top, text="ACTIVITY LOG",
+                     font=ctk.CTkFont("Consolas", 10),
+                     text_color="#22223a").pack(side="left")
+        ctk.CTkButton(top, text="clear", width=42, height=20,
+                      font=ctk.CTkFont("Consolas", 10),
+                      fg_color="transparent", hover_color="#141428",
+                      text_color="#333355",
+                      command=self._clear_log).pack(side="right")
 
         self._logbox = ctk.CTkTextbox(
-            lf,
-            font=ctk.CTkFont("Consolas", 11),
-            fg_color="#06060e",
-            text_color="#00ff88",
-            corner_radius=10,
-            state="disabled",
-            wrap="word",
+            lf, font=ctk.CTkFont("Consolas", 11),
+            fg_color="#06060e", text_color="#00ff88",
+            corner_radius=10, state="disabled", wrap="word",
         )
         self._logbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
@@ -134,28 +142,21 @@ class App(ctk.CTk):
         tb.tag_config("warn",  foreground="#ffaa00")
         tb.tag_config("error", foreground="#ff3355")
 
-    def _status_row(self, parent, label, value, color, bold=True):
+    def _srow(self, parent, label, value, color, bold=True):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=18, pady=8)
-
-        ctk.CTkLabel(
-            row, text=label,
-            font=ctk.CTkFont("Consolas", 11),
-            text_color="#333355", width=140, anchor="w",
-        ).pack(side="left")
-
-        lbl = ctk.CTkLabel(
-            row, text=value,
-            font=ctk.CTkFont("Consolas", 11, "bold" if bold else "normal"),
-            text_color=color,
-        )
+        ctk.CTkLabel(row, text=label,
+                     font=ctk.CTkFont("Consolas", 11),
+                     text_color="#333355", width=140, anchor="w").pack(side="left")
+        lbl = ctk.CTkLabel(row, text=value,
+                           font=ctk.CTkFont("Consolas", 11, "bold" if bold else "normal"),
+                           text_color=color)
         lbl.pack(side="right")
         return lbl
 
     def _sep(self, parent):
-        ctk.CTkFrame(parent, fg_color="#151528", height=1, corner_radius=0).pack(
-            fill="x", padx=16
-        )
+        ctk.CTkFrame(parent, fg_color="#151528", height=1,
+                     corner_radius=0).pack(fill="x", padx=16)
 
     # ── Logging ───────────────────────────────────────────────────────────────
 
@@ -169,7 +170,6 @@ class App(ctk.CTk):
         self._logbox.configure(state="disabled")
 
     def _tlog(self, msg, style="ok"):
-        """Thread-safe log — safe to call after window is closed."""
         if not self._closing:
             self.after(0, lambda: self._log(msg, style))
 
@@ -203,7 +203,7 @@ class App(ctk.CTk):
 
         threading.Thread(target=_check, daemon=True).start()
 
-    # ── Proxy registry ────────────────────────────────────────────────────────
+    # ── Proxy ─────────────────────────────────────────────────────────────────
 
     def _enable_proxy(self):
         pac_url = (BASE_DIR / "proxy.pac").as_uri()
@@ -211,10 +211,8 @@ class App(ctk.CTk):
             k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
             winreg.SetValueEx(k, "AutoConfigURL", 0, winreg.REG_SZ,    pac_url)
             winreg.SetValueEx(k, "ProxyEnable",   0, winreg.REG_DWORD, 1)
-            try:
-                winreg.DeleteValue(k, "ProxyServer")
-            except OSError:
-                pass
+            try: winreg.DeleteValue(k, "ProxyServer")
+            except OSError: pass
             winreg.CloseKey(k)
             return True
         except Exception as e:
@@ -225,22 +223,19 @@ class App(ctk.CTk):
         try:
             k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
             winreg.SetValueEx(k, "ProxyEnable", 0, winreg.REG_DWORD, 0)
-            try:
-                winreg.DeleteValue(k, "AutoConfigURL")
-            except OSError:
-                pass
+            try: winreg.DeleteValue(k, "AutoConfigURL")
+            except OSError: pass
             winreg.CloseKey(k)
         except Exception as e:
             self._tlog(f"Failed to disable proxy: {e}", "error")
 
-    # ── Start / Stop ──────────────────────────────────────────────────────────
+    # ── Tunnel ────────────────────────────────────────────────────────────────
 
     def _start(self):
         self._start_btn.configure(state="disabled", text="  CONNECTING...")
         self._tunnel_dot.configure(text="● CONNECTING", text_color="#ffaa00")
 
         def _run():
-            # ping
             self._tlog("Checking server...", "dim")
             try:
                 urllib.request.urlopen(
@@ -251,35 +246,27 @@ class App(ctk.CTk):
             except Exception as e:
                 self._tlog(f"Server ping failed ({e}) — trying anyway", "warn")
 
-            # deps
             ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
             if not ws_pkg.exists():
                 self._tlog("Installing dependencies...", "info")
-                r = subprocess.run(
-                    ["npm", "install"],
-                    cwd=str(BASE_DIR),
-                    capture_output=True, text=True,
-                )
+                r = subprocess.run(["npm", "install"], cwd=str(BASE_DIR),
+                                   capture_output=True, text=True)
                 if r.returncode != 0:
-                    self._tlog(f"npm install failed:\n{r.stderr.strip()}", "error")
+                    self._tlog(f"npm install failed: {r.stderr.strip()}", "error")
                     self.after(0, self._reset_ui)
                     return
                 self._tlog("Dependencies installed", "ok")
 
-            # proxy
             if not self._enable_proxy():
                 self.after(0, self._reset_ui)
                 return
             self._tlog("System proxy enabled (PAC)", "ok")
 
-            # node
             try:
                 self._proc = subprocess.Popen(
                     ["node", str(BASE_DIR / "client.js")],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True, bufsize=1,
-                    cwd=str(BASE_DIR),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, cwd=str(BASE_DIR),
                 )
                 self.after(0, self._on_connected)
                 for line in self._proc.stdout:
@@ -292,7 +279,7 @@ class App(ctk.CTk):
                 self._tlog("node.exe not found — install Node.js from nodejs.org", "error")
                 self.after(0, self._reset_ui)
             except Exception as e:
-                self._tlog(f"Unexpected error: {e}", "error")
+                self._tlog(f"Error: {e}", "error")
                 self.after(0, self._reset_ui)
 
         threading.Thread(target=_run, daemon=True).start()
@@ -304,12 +291,11 @@ class App(ctk.CTk):
             self._proc.terminate()
 
     def _on_connected(self):
-        self._connected   = True
-        self._start_time  = time.time()
+        self._connected  = True
+        self._start_time = time.time()
         self._tunnel_dot.configure(text="● CONNECTED", text_color="#00ff88")
-        self._stop_btn.configure(
-            state="normal", fg_color="#5c0000", hover_color="#880000"
-        )
+        self._stop_btn.configure(state="normal",
+                                  fg_color="#5c0000", hover_color="#880000")
         self._log("Tunnel active — traffic routed through Render", "ok")
         self._tick_uptime()
         self._pulse()
@@ -321,24 +307,21 @@ class App(ctk.CTk):
             self._pulse_job = None
         self._disable_proxy()
         self._tunnel_dot.configure(text="● OFFLINE",  text_color="#2a2a44")
-        self._uptime_lbl.configure(text="--:--:--",  text_color="#2a2a44")
+        self._uptime_lbl.configure(text="--:--:--",         text_color="#2a2a44")
         self._log("Disconnected — proxy disabled", "warn")
         self._reset_ui()
 
     def _reset_ui(self):
         self._start_btn.configure(state="normal", text="▶   START")
-        self._stop_btn.configure(
-            state="disabled", fg_color="#1a1a2e", hover_color="#1a1a2e"
-        )
-
-    # ── Uptime + pulse ────────────────────────────────────────────────────────
+        self._stop_btn.configure(state="disabled",
+                                  fg_color="#1a1a2e", hover_color="#1a1a2e")
 
     def _tick_uptime(self):
         if not self._connected:
             return
         s = int(time.time() - self._start_time)
         self._uptime_lbl.configure(
-            text=f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}",
+            text=f"{s//3600:02d}:{(s%3600)//60:02d}:{s%60:02d}",
             text_color="#00d4ff",
         )
         self.after(1000, self._tick_uptime)
@@ -348,15 +331,12 @@ class App(ctk.CTk):
             return
         self._pulse_on = not self._pulse_on
         self._tunnel_dot.configure(
-            text_color="#00ff88" if self._pulse_on else "#006633"
-        )
+            text_color="#00ff88" if self._pulse_on else "#006633")
         self._pulse_job = self.after(900, self._pulse)
 
-    # ── Close ─────────────────────────────────────────────────────────────────
-
     def _on_close(self):
-        self._closing = True
-        self._connected = False          # stop pulse / uptime ticks
+        self._closing   = True
+        self._connected = False
         if self._pulse_job:
             self.after_cancel(self._pulse_job)
         if self._proc:

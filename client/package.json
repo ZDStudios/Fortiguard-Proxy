@@ -1,0 +1,9 @@
+{
+  "name": "fortiguard-client",
+  "version": "2.0.0",
+  "description": "FortiProxy local tunnel client",
+  "main": "client.js",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
