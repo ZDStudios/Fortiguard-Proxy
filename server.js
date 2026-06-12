@@ -82,7 +82,7 @@ tbody td{padding:11px 14px;border-bottom:1px solid #0d0d1e;font-size:.87em;verti
     <div class="sub">SERVER DASHBOARD</div>
     <input type="password" id="tok" placeholder="Access token" autocomplete="current-password"
            onkeydown="if(event.key==='Enter')doLogin()">
-    <button onclick="doLogin()">ACCESS DASHBOARD</button>
+    <button id="loginbtn" onclick="doLogin()">ACCESS DASHBOARD</button>
     <div class="err" id="lerr"></div>
   </div>
 </div>
@@ -113,27 +113,38 @@ tbody td{padding:11px 14px;border-bottom:1px solid #0d0d1e;font-size:.87em;verti
 <script>
 let _tok='', _refreshTimer=null;
 
-(function boot(){
-  const s=localStorage.getItem('fp_token');
+// Safe localStorage wrappers — school browsers may block storage entirely
+function lsGet(k){try{return localStorage.getItem(k);}catch{return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch{}}
+function lsDel(k){try{localStorage.removeItem(k);}catch{}}
+
+try{
+  const s=lsGet('fp_token');
   if(s) verify(s,true);
-})();
+}catch(e){console.warn('boot error',e);}
 
 function verify(token,silent){
+  const btn=document.getElementById('loginbtn');
   fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})})
-  .then(r=>r.json()).then(d=>{
-    if(d.ok){_tok=token;showDash();}
-    else{localStorage.removeItem('fp_token');if(!silent)setErr('Invalid token');}
-  }).catch(()=>{if(!silent)setErr('Connection error');});
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d&&d.ok){_tok=token;lsSet('fp_token',token);showDash();}
+    else{lsDel('fp_token');if(!silent)setErr('Invalid token');}
+  })
+  .catch(function(e){console.error('auth error',e);if(!silent)setErr('Connection error — check console');})
+  .finally(function(){if(btn){btn.disabled=false;btn.textContent='ACCESS DASHBOARD';}});
 }
 function doLogin(){
+  const btn=document.getElementById('loginbtn');
   const t=document.getElementById('tok').value.trim();
   if(!t){setErr('Enter your token');return;}
   setErr('');
-  localStorage.setItem('fp_token',t);
+  btn.disabled=true;
+  btn.textContent='CHECKING...';
   verify(t,false);
 }
 function doLogout(){
-  localStorage.removeItem('fp_token');
+  lsDel('fp_token');
   _tok='';
   clearInterval(_refreshTimer);
   document.getElementById('dash').style.display='none';
@@ -250,7 +261,7 @@ const server = http.createServer((req, res) => {
   if (pathname === "/api/auth" && req.method === "POST") {
     readBody(b => {
       const ok = !TOKEN || b.token === TOKEN;
-      res.writeHead(ok ? 200 : 401, { "Content-Type": "application/json" });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok }));
     });
     return;
