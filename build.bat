@@ -9,44 +9,51 @@ echo   FortiProxy - EXE Builder
 echo  ===================================
 echo.
 
-:: Check Python
 where python >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python not found. Download from https://python.org
     pause & exit /b 1
 )
 
-:: Install deps
 echo [....] Installing build dependencies...
 pip install pyinstaller customtkinter -q --disable-pip-version-check
 echo [OK]   Dependencies ready
 
-:: Clean old build
-if exist "%DIR%dist\FortiProxy.exe" del /f /q "%DIR%dist\FortiProxy.exe"
-if exist "%DIR%build"               rmdir /s /q "%DIR%build"
-if exist "%DIR%FortiProxy.spec"     del /f /q "%DIR%FortiProxy.spec"
+:: Move into the project folder so all paths are relative (avoids trailing-backslash quoting bug)
+pushd "%DIR%"
 
-:: Build (single line - avoids ^ continuation issues)
+:: Clean previous build
+if exist "build"           rmdir /s /q "build"
+if exist "FortiProxy.spec" del /f /q "FortiProxy.spec"
+if exist "FortiProxy.exe"  del /f /q "FortiProxy.exe"
+
 echo [....] Compiling - this takes 30-60 seconds...
 echo.
 
-pyinstaller --onefile --windowed --collect-all customtkinter --name "FortiProxy" --distpath "%DIR%dist" --workpath "%DIR%build" --specpath "%DIR%" "%DIR%dashboard.py"
+pyinstaller --onefile --windowed --collect-all customtkinter --name "FortiProxy" --distpath "." --workpath "build" --specpath "." "dashboard.py"
+
+set RESULT=%errorlevel%
+
+:: Clean up build leftovers
+if exist "build"           rmdir /s /q "build"
+if exist "FortiProxy.spec" del /f /q "FortiProxy.spec"
+
+popd
 
 echo.
-if not exist "%DIR%dist\FortiProxy.exe" (
+if %RESULT% neq 0 (
     echo [ERROR] Build failed - check output above
+    pause & exit /b 1
+)
+
+if not exist "%DIR%FortiProxy.exe" (
+    echo [ERROR] EXE not found after build
     pause & exit /b 1
 )
 
 echo [OK]   Build complete!
 echo.
-echo  EXE is at:
-echo    %DIR%dist\FortiProxy.exe
-echo.
-echo  Copy these into the same folder as FortiProxy.exe:
-echo    client.js
-echo    proxy.pac
-echo    package.json
-echo  Then run: npm install
+echo  FortiProxy.exe is ready in:
+echo    %DIR%
 echo.
 pause
