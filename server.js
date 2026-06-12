@@ -1,6 +1,6 @@
 const http = require("http");
 const net = require("net");
-const { WebSocketServer } = require("ws");
+const { WebSocket, WebSocketServer } = require("ws");
 
 const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.PROXY_TOKEN || "";
@@ -28,18 +28,20 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
-  const socket = net.connect(port, host, () => {
+  const socket = net.connect(port, host);
+
+  socket.on("connect", () => {
     ws.on("message", (data) => {
       if (!socket.destroyed) socket.write(data);
     });
+  });
 
-    socket.on("data", (data) => {
-      if (ws.readyState === ws.OPEN) ws.send(data);
-    });
+  socket.on("data", (data) => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
   });
 
   socket.on("error", (err) => {
-    console.error(`Tunnel error ${host}:${port} — ${err.message}`);
+    console.error(`TCP error ${host}:${port} — ${err.message}`);
     ws.close(4003, err.message);
   });
 
