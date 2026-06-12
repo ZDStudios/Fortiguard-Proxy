@@ -275,10 +275,13 @@ class App(ctk.CTk):
             self._tlog("System proxy enabled (PAC)", "ok")
 
             try:
+                # CREATE_NO_WINDOW stops a console popping up on Windows
+                extra = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
                 self._proc = subprocess.Popen(
                     ["node", str(BASE_DIR / "client.js")],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, bufsize=1, cwd=str(BASE_DIR),
+                    **extra,
                 )
                 self.after(0, self._on_connected)
                 for line in self._proc.stdout:
