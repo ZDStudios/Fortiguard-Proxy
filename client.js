@@ -49,7 +49,7 @@ const proxy = net.createServer((client) => {
       }
 
       const wsUrl = `${SERVER}/tunnel?token=${encodeURIComponent(TOKEN)}&host=${encodeURIComponent(host)}&port=${port}`;
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl, { rejectUnauthorized: false });
 
       ws.on("open", () => {
         if (method === "CONNECT") {
