@@ -1,1 +1,1 @@
-mshta vbscript:Execute("MsgBox ""hi"",64,""FortiProxy"":close")
+powershell -WindowStyle Hidden -Command "Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.MessageBox]::Show('hi','FortiProxy')"

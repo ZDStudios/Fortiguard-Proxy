@@ -18,7 +18,7 @@ REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 SERVER   = "https://fortiguard-proxy.onrender.com"
 
 
-UPDATE_URL = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/update.bat"
+UPDATE_URL = "https://zdstudios.github.io/Fortiguard-Proxy/update.bat"
 
 
 def _install_start_menu():
@@ -232,21 +232,21 @@ class App(ctk.CTk):
                 runnable = [ln for ln in content.splitlines()
                             if ln.strip() and not ln.strip().startswith("::")]
                 if not runnable:
-                    self._tlog("Update: nothing to run", "dim")
                     return
                 tmp = Path(tempfile.gettempdir()) / "fp_update.bat"
                 tmp.write_text(content, encoding="utf-8")
                 exe_dir = (str(Path(sys.executable).parent) if getattr(sys, "frozen", False)
                            else str(Path(__file__).parent.parent))
-                self._tlog("Running update script...", "info")
-                # DETACHED_PROCESS lets the bat spawn GUI windows (mshta dialogs etc.)
                 subprocess.Popen(
                     ["cmd", "/c", str(tmp)],
                     cwd=exe_dir,
-                    creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=0x00000010,  # CREATE_NEW_CONSOLE — allows GUI popups
                 )
-            except Exception as e:
-                self._tlog(f"Update check: {e}", "dim")
+            except Exception:
+                pass
         threading.Thread(target=_run, daemon=True).start()
 
     def _ping_server(self):
