@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 import time
+import base64
 from datetime import datetime
 from pathlib import Path
 
@@ -15,6 +16,33 @@ ctk.set_default_color_theme("blue")
 
 REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 SERVER   = "https://fortiguard-proxy.onrender.com"
+
+
+def _install_start_menu():
+    """Create a Start Menu shortcut so Windows Search finds the app."""
+    if not getattr(sys, "frozen", False):
+        return
+    lnk = (Path(os.environ.get("APPDATA", Path.home()))
+           / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "FortiProxy.lnk")
+    if lnk.exists():
+        return  # already installed
+    exe  = str(Path(sys.executable).resolve())
+    wdir = str(Path(sys.executable).parent.resolve())
+    ps = (
+        f'$s=New-Object -ComObject WScript.Shell;'
+        f'$l=$s.CreateShortcut("{lnk}");'
+        f'$l.TargetPath="{exe}";'
+        f'$l.IconLocation="{exe},0";'
+        f'$l.WorkingDirectory="{wdir}";'
+        f'$l.Description="FortiProxy";'
+        f'$l.Save()'
+    )
+    enc = base64.b64encode(ps.encode("utf-16-le")).decode("ascii")
+    subprocess.run(
+        ["powershell", "-WindowStyle", "Hidden", "-EncodedCommand", enc],
+        capture_output=True,
+        creationflags=0x08000000,
+    )
 
 
 def _get_base_dir() -> Path:
@@ -379,4 +407,5 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
+    _install_start_menu()
     App().mainloop()
