@@ -22,6 +22,8 @@ if not ws_dir.exists():
     print("[FortiProxy] npm install done")
 
 # ── Step 2: build EXE with node_modules/ws bundled inside ────────────────────
+icon_path = app_dir.parent / "icon.ico"
+
 args = [
     sys.executable, "-m", "PyInstaller",
     "--onefile",
@@ -31,6 +33,7 @@ args = [
     *add_data(client_dir / "proxy.pac",             "."),
     *add_data(client_dir / "package.json",          "."),
     *add_data(client_dir / "node_modules" / "ws",   "node_modules/ws"),
+    "--icon",      str(icon_path),
     "--name",      "FortiProxy",
     "--distpath",  str(out_dir),
     "--workpath",  str(app_dir / "build"),
