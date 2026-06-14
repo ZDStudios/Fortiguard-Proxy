@@ -93,6 +93,7 @@ class App(ctk.CTk):
         self._pulse_on   = False
         self._closing    = False
         self._blocked    = False
+        self._retry_job  = None
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -250,6 +251,10 @@ class App(ctk.CTk):
         threading.Thread(target=_run, daemon=True).start()
 
     def _ping_server(self):
+        # Cancel any pending auto-retry before starting a fresh ping
+        if self._retry_job:
+            self.after_cancel(self._retry_job)
+            self._retry_job = None
         self._server_dot.configure(text="● CHECKING", text_color="#ffaa00")
         self._refresh_btn.configure(state="disabled")
         self._tlog("Pinging Render server...", "dim")
@@ -263,10 +268,12 @@ class App(ctk.CTk):
                 self.after(0, lambda: self._server_dot.configure(
                     text="● ONLINE", text_color="#00ff88"))
                 self._tlog("Render server is online", "ok")
-            except Exception as e:
+            except Exception:
                 self.after(0, lambda: self._server_dot.configure(
                     text="● OFFLINE", text_color="#ff3355"))
-                self._tlog(f"Server unreachable — {e}", "warn")
+                self._tlog("Server offline — retrying in 15s (Render cold start)...", "warn")
+                # Auto-retry: Render spins down idle servers, cold start takes ~20-30s
+                self._retry_job = self.after(15000, self._ping_server)
             finally:
                 self.after(0, lambda: self._refresh_btn.configure(state="normal"))
 
@@ -383,10 +390,14 @@ class App(ctk.CTk):
 
     def _handle_server_cmd(self, cmd):
         if cmd == "block":
-            self._blocked = True
-            self._log("Blocked by server admin — proxy disabled", "error")
+            self._blocked   = True
+            self._connected = False  # stop pulse immediately so it can't overwrite red
+            if self._pulse_job:
+                self.after_cancel(self._pulse_job)
+                self._pulse_job = None
             self._disable_proxy()
             self._tunnel_dot.configure(text="● BLOCKED", text_color="#ff3355")
+            self._log("Blocked by server admin — proxy disabled", "error")
         elif cmd == "unblock":
             self._blocked = False
             self._log("Unblocked by server admin", "ok")
@@ -432,6 +443,8 @@ class App(ctk.CTk):
         self._connected = False
         if self._pulse_job:
             self.after_cancel(self._pulse_job)
+        if self._retry_job:
+            self.after_cancel(self._retry_job)
         if self._proc:
             self._proc.terminate()
         self._disable_proxy()
