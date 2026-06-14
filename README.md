@@ -29,6 +29,3 @@ Bypasses Fortiguard web filtering on school networks by tunneling traffic throug
 - **Client** — Python (CustomTkinter GUI) + Node.js (WebSocket tunnel)
 - **Server** — Node.js on Render (WebSocket proxy + admin dashboard)
 
-## Admin dashboard
-
-Visit the Render server URL and log in to see connected devices and block/unblock them remotely.
