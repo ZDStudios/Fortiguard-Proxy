@@ -288,17 +288,19 @@ class App(ctk.CTk):
     # ── Proxy ─────────────────────────────────────────────────────────────────
 
     def _enable_proxy(self):
-        pac_url = (BASE_DIR / "proxy.pac").as_uri()
+        # Direct proxy — avoids file:// PAC URL which Chrome on managed machines blocks
         try:
             k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-            winreg.SetValueEx(k, "AutoConfigURL", 0, winreg.REG_SZ,    pac_url)
+            winreg.SetValueEx(k, "ProxyServer",   0, winreg.REG_SZ,    "127.0.0.1:8080")
             winreg.SetValueEx(k, "ProxyEnable",   0, winreg.REG_DWORD, 1)
-            try: winreg.DeleteValue(k, "ProxyServer")
+            winreg.SetValueEx(k, "ProxyOverride", 0, winreg.REG_SZ,
+                              "localhost;127.*;10.*;172.16.*;192.168.*;<local>")
+            try: winreg.DeleteValue(k, "AutoConfigURL")
             except OSError: pass
             winreg.CloseKey(k)
             return True
         except PermissionError:
-            self._tlog("Registry blocked — right-click FortiProxy and Run as administrator", "error")
+            self._tlog("Registry blocked — right-click FortiProxy → Run as administrator", "error")
             return False
         except Exception as e:
             self._tlog(f"Failed to set proxy ({e})", "error")
@@ -308,8 +310,9 @@ class App(ctk.CTk):
         try:
             k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
             winreg.SetValueEx(k, "ProxyEnable", 0, winreg.REG_DWORD, 0)
-            try: winreg.DeleteValue(k, "AutoConfigURL")
-            except OSError: pass
+            for val in ("ProxyServer", "AutoConfigURL", "ProxyOverride"):
+                try: winreg.DeleteValue(k, val)
+                except OSError: pass
             winreg.CloseKey(k)
         except Exception as e:
             self._tlog(f"Failed to disable proxy: {e}", "error")
@@ -349,7 +352,7 @@ class App(ctk.CTk):
             if not self._enable_proxy():
                 self.after(0, self._reset_ui)
                 return
-            self._tlog("System proxy enabled (PAC)", "ok")
+            self._tlog("System proxy set to 127.0.0.1:8080", "ok")
 
             try:
                 # CREATE_NO_WINDOW stops a console popping up on Windows
