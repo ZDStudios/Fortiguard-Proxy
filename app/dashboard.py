@@ -3,6 +3,7 @@ import subprocess
 import threading
 import winreg
 import urllib.request
+import ssl
 import os
 import sys
 import shutil
@@ -10,6 +11,11 @@ import time
 import base64
 from datetime import datetime
 from pathlib import Path
+
+# SSL context that skips cert verification — handles school HTTPS inspection (MITM)
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode    = ssl.CERT_NONE
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -263,15 +269,15 @@ class App(ctk.CTk):
             try:
                 urllib.request.urlopen(
                     urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
-                    timeout=12,
+                    timeout=12, context=_SSL_CTX,
                 )
                 self.after(0, lambda: self._server_dot.configure(
                     text="● ONLINE", text_color="#00ff88"))
                 self._tlog("Render server is online", "ok")
-            except Exception:
+            except Exception as e:
                 self.after(0, lambda: self._server_dot.configure(
                     text="● OFFLINE", text_color="#ff3355"))
-                self._tlog("Server offline — retrying in 15s (Render cold start)...", "warn")
+                self._tlog(f"Server unreachable ({e}) — retrying in 15s", "warn")
                 # Auto-retry: Render spins down idle servers, cold start takes ~20-30s
                 self._retry_job = self.after(15000, self._ping_server)
             finally:
@@ -291,8 +297,11 @@ class App(ctk.CTk):
             except OSError: pass
             winreg.CloseKey(k)
             return True
+        except PermissionError:
+            self._tlog("Registry blocked — right-click FortiProxy and Run as administrator", "error")
+            return False
         except Exception as e:
-            self._tlog(f"Failed to enable proxy: {e}", "error")
+            self._tlog(f"Failed to set proxy ({e})", "error")
             return False
 
     def _disable_proxy(self):
@@ -316,11 +325,11 @@ class App(ctk.CTk):
             try:
                 urllib.request.urlopen(
                     urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
-                    timeout=12,
+                    timeout=12, context=_SSL_CTX,
                 )
                 self._tlog("Server online", "ok")
             except Exception as e:
-                self._tlog(f"Server ping failed ({e}) — trying anyway", "warn")
+                self._tlog(f"Server unreachable ({e}) — trying anyway", "warn")
 
             ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
             if not ws_pkg.exists():

@@ -21,6 +21,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Remove "downloaded from internet" mark so Windows doesn't restrict it
+powershell -WindowStyle Hidden -Command "Unblock-File -Path '%INSTALL_DIR%\FortiProxy.exe'" >nul 2>&1
+
 echo Launching FortiProxy...
 start "" "%INSTALL_DIR%\FortiProxy.exe"
 
