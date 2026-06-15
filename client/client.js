@@ -88,16 +88,17 @@ const proxy = net.createServer((client) => {
         } catch { client.destroy(); return; }
       }
 
+      // host/port sent as first WS message, NOT in the URL —
+      // keeps destination out of the URL so Fortiguard can't block on it
       const wsUrl =
         `${SERVER}/tunnel` +
         `?token=${encodeURIComponent(TOKEN)}` +
-        `&host=${encodeURIComponent(host)}` +
-        `&port=${port}` +
         `&device=${encodeURIComponent(DEVICE)}`;
 
       ws = new WebSocket(wsUrl, { rejectUnauthorized: false });
 
       ws.on("open", () => {
+        ws.send(JSON.stringify({ host, port }));   // tell server where to connect
         if (method === "CONNECT") {
           client.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: FortiProxy/2.0\r\n\r\n");
           for (const d of pending) ws.send(d);

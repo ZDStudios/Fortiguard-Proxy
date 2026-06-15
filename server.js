@@ -461,31 +461,51 @@ wss.on("connection", (ws, req) => {
   }
 
   // Tunnel
+  // host/port are sent as first WS message (not URL params) to avoid URL-based filtering
   if (path === "/tunnel") {
     if (blocked.has(device)) { ws.close(4403, "Blocked"); return; }
 
-    const host = params.get("host");
-    const port = parseInt(params.get("port"), 10) || 80;
-    if (!host) { ws.close(4002, "Missing host"); return; }
+    ws.once("message", (initData) => {
+      let host, port;
+      try {
+        const msg = JSON.parse(initData.toString());
+        host = msg.host;
+        port = parseInt(msg.port, 10) || 80;
+      } catch { ws.close(4002, "Bad init"); return; }
+      if (!host) { ws.close(4002, "Missing host"); return; }
 
-    const info = touch(device, ip);
-    info.requests++;
-    info.activeTunnels = (info.activeTunnels || 0) + 1;
+      const info = touch(device, ip);
+      info.requests++;
+      info.activeTunnels = (info.activeTunnels || 0) + 1;
 
-    const socket = net.connect(port, host);
-    socket.on("connect", () => {
-      ws.on("message", data => { if (!socket.destroyed) socket.write(data); });
+      const queued  = [];
+      let   tcpReady = false;
+      const socket  = net.connect(port, host);
+
+      // Buffer WS messages that arrive before the TCP connection is open
+      ws.on("message", data => {
+        if (socket.destroyed) return;
+        if (tcpReady) socket.write(data);
+        else queued.push(data);
+      });
+
+      socket.on("connect", () => {
+        tcpReady = true;
+        for (const d of queued) socket.write(d);
+        queued.length = 0;
+      });
+      socket.on("data", data => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
+
+      const cleanup = () => {
+        info.activeTunnels = Math.max(0, (info.activeTunnels || 1) - 1);
+      };
+      socket.on("error", () => { cleanup(); ws.close(4003, "Socket error"); });
+      socket.on("close", () => { cleanup(); ws.terminate(); });
+      ws.on("close",     () => { cleanup(); socket.destroy(); });
+      ws.on("error",     () => { cleanup(); socket.destroy(); });
     });
-    socket.on("data", data => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(data);
-    });
-    const cleanup = () => {
-      info.activeTunnels = Math.max(0, (info.activeTunnels || 1) - 1);
-    };
-    socket.on("error", () => { cleanup(); ws.close(4003, "Socket error"); });
-    socket.on("close", () => { cleanup(); ws.terminate(); });
-    ws.on("close",     () => { cleanup(); socket.destroy(); });
-    ws.on("error",     () => { cleanup(); socket.destroy(); });
     return;
   }
 
