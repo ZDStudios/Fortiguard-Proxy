@@ -4,6 +4,7 @@ import threading
 import winreg
 import urllib.request
 import ssl
+import ctypes
 import os
 import sys
 import shutil
@@ -287,6 +288,15 @@ class App(ctk.CTk):
 
     # ── Proxy ─────────────────────────────────────────────────────────────────
 
+    def _refresh_proxy(self):
+        # Tell Windows/Chrome to immediately re-read proxy settings from the registry
+        try:
+            _wininet = ctypes.windll.Wininet
+            _wininet.InternetSetOptionW(0, 39, 0, 0)  # INTERNET_OPTION_SETTINGS_CHANGED
+            _wininet.InternetSetOptionW(0, 37, 0, 0)  # INTERNET_OPTION_REFRESH
+        except Exception:
+            pass
+
     def _enable_proxy(self):
         # Direct proxy — avoids file:// PAC URL which Chrome on managed machines blocks
         try:
@@ -298,6 +308,7 @@ class App(ctk.CTk):
             try: winreg.DeleteValue(k, "AutoConfigURL")
             except OSError: pass
             winreg.CloseKey(k)
+            self._refresh_proxy()
             return True
         except PermissionError:
             self._tlog("Registry blocked — right-click FortiProxy → Run as administrator", "error")
@@ -314,6 +325,7 @@ class App(ctk.CTk):
                 try: winreg.DeleteValue(k, val)
                 except OSError: pass
             winreg.CloseKey(k)
+            self._refresh_proxy()
         except Exception as e:
             self._tlog(f"Failed to disable proxy: {e}", "error")
 
