@@ -5,6 +5,9 @@ import winreg
 import urllib.request
 import ssl
 import ctypes
+import io
+import json
+import zipfile
 import os
 import sys
 import shutil
@@ -21,8 +24,10 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-SERVER   = "https://fortiguard-proxy.onrender.com"
+REG_PATH  = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+SERVER    = "https://fortiguard-proxy.onrender.com"
+NODE_DIR  = Path(os.environ.get("APPDATA", Path.home())) / "FortiProxy" / "nodejs"
+NODE_EXE  = NODE_DIR / "node.exe"
 
 
 UPDATE_URL = "https://zdstudios.github.io/Fortiguard-Proxy/update.bat"
@@ -331,6 +336,55 @@ class App(ctk.CTk):
 
     # ── Tunnel ────────────────────────────────────────────────────────────────
 
+    def _ensure_node(self) -> str:
+        """Return path to node.exe, downloading portable LTS if not found."""
+        if NODE_EXE.exists():
+            return str(NODE_EXE)
+        found = shutil.which("node")
+        if found:
+            return found
+
+        self._tlog("Node.js not found — downloading portable version (~28 MB)...", "warn")
+        try:
+            req = urllib.request.Request(
+                "https://nodejs.org/dist/index.json",
+                headers={"User-Agent": "FortiProxy/2.0"},
+            )
+            with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as r:
+                releases = json.loads(r.read())
+            lts = next((rel for rel in releases if rel.get("lts")), None)
+            if not lts:
+                raise RuntimeError("No LTS release found in Node.js index")
+            version = lts["version"]
+            url = f"https://nodejs.org/dist/{version}/node-{version}-win-x64.zip"
+            self._tlog(f"Downloading Node.js {version}...", "info")
+
+            req = urllib.request.Request(url, headers={"User-Agent": "FortiProxy/2.0"})
+            with urllib.request.urlopen(req, timeout=300, context=_SSL_CTX) as r:
+                total    = int(r.headers.get("Content-Length", 0))
+                data     = bytearray()
+                last_pct = -1
+                while True:
+                    chunk = r.read(131072)
+                    if not chunk:
+                        break
+                    data.extend(chunk)
+                    if total:
+                        pct = (len(data) * 100 // total) // 10 * 10
+                        if pct != last_pct:
+                            self._tlog(f"Downloading... {pct}%", "dim")
+                            last_pct = pct
+
+            NODE_DIR.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(io.BytesIO(bytes(data))) as zf:
+                entry = next(n for n in zf.namelist() if n.endswith("/node.exe"))
+                NODE_EXE.write_bytes(zf.read(entry))
+
+            self._tlog(f"Node.js {version} ready", "ok")
+            return str(NODE_EXE)
+        except Exception as e:
+            raise RuntimeError(f"Could not install Node.js: {e}")
+
     def _start(self):
         self._start_btn.configure(state="disabled", text="  CONNECTING...")
         self._tunnel_dot.configure(text="● CONNECTING", text_color="#ffaa00")
@@ -361,16 +415,22 @@ class App(ctk.CTk):
                     return
                 self._tlog("Dependencies installed", "ok")
 
+            try:
+                node = self._ensure_node()
+            except RuntimeError as e:
+                self._tlog(str(e), "error")
+                self.after(0, self._reset_ui)
+                return
+
             if not self._enable_proxy():
                 self.after(0, self._reset_ui)
                 return
             self._tlog("System proxy set to 127.0.0.1:8080", "ok")
 
             try:
-                # CREATE_NO_WINDOW stops a console popping up on Windows
                 extra = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
                 self._proc = subprocess.Popen(
-                    ["node", str(BASE_DIR / "client.js")],
+                    [node, str(BASE_DIR / "client.js")],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, bufsize=1, cwd=str(BASE_DIR),
                     **extra,
@@ -387,11 +447,8 @@ class App(ctk.CTk):
                         self._tlog(line, "info")
                 self._proc.wait()
                 self.after(0, self._on_disconnected)
-            except FileNotFoundError:
-                self._tlog("node.exe not found — install Node.js from nodejs.org", "error")
-                self.after(0, self._reset_ui)
             except Exception as e:
-                self._tlog(f"Error: {e}", "error")
+                self._tlog(f"Error starting proxy: {e}", "error")
                 self.after(0, self._reset_ui)
 
         threading.Thread(target=_run, daemon=True).start()
