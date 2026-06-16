@@ -12,11 +12,15 @@ if not exist "%EXE%" (
 
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-:: Kill any running FortiProxy or node so the EXE isn't locked
-echo Stopping any running FortiProxy instance...
-taskkill /IM FortiProxy.exe /F >nul 2>&1
+:: Signal FortiProxy to quit gracefully (cleans up tray icon properly)
+echo Stopping FortiProxy...
+echo quit > "%APPDATA%\FortiProxy\.quit_signal"
+timeout /t 3 /nobreak >nul
+
+:: Kill node proxy and any remaining FortiProxy instance
 taskkill /IM node.exe /F >nul 2>&1
-timeout /t 2 /nobreak >nul
+taskkill /IM FortiProxy.exe /F >nul 2>&1
+timeout /t 1 /nobreak >nul
 
 echo Installing FortiProxy...
 copy /Y "%EXE%" "%INSTALL_DIR%\FortiProxy.exe" >nul 2>&1

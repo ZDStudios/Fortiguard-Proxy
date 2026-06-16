@@ -262,6 +262,20 @@ def _set_boot_enabled(enabled: bool):
         pass
 
 
+# ── Single instance lock ──────────────────────────────────────────────────────
+
+_INSTANCE_MUTEX = None
+QUIT_SIGNAL     = Path(APPDATA) / "FortiProxy" / ".quit_signal"
+
+
+def _ensure_single_instance() -> bool:
+    """Create a named Windows mutex. Returns False if another instance is already running."""
+    global _INSTANCE_MUTEX
+    _INSTANCE_MUTEX = ctypes.windll.kernel32.CreateMutexW(None, False,
+                                                           "Local\\FortiProxy_SingleInstance")
+    return ctypes.windll.kernel32.GetLastError() != 183  # 183 = ERROR_ALREADY_EXISTS
+
+
 # ── Emergency cleanup ─────────────────────────────────────────────────────────
 
 @atexit.register
@@ -373,10 +387,15 @@ class App(ctk.CTk):
         if self._settings.get("launch_minimized", False):
             self.after(100, self.withdraw)
 
+        # Clear any stale quit signal from a previous crash
+        try: QUIT_SIGNAL.unlink(missing_ok=True)
+        except Exception: pass
+
         self._log("Dashboard ready", "dim")
         self._ping_server()
         self.after(1500, self._check_update)
         self.after(3000, self._auto_check_update)
+        self.after(1000, self._check_quit_signal)
 
         if self._settings.get("auto_connect", False):
             self.after(5000, self._start)
@@ -1227,6 +1246,19 @@ class App(ctk.CTk):
             text_color=_T["connected"] if self._pulse_on else _T["conn_dim"])
         self._pulse_job = self.after(900, self._pulse)
 
+    def _check_quit_signal(self):
+        """Polls for a .quit_signal file written by install.bat for graceful shutdown."""
+        if self._closing:
+            return
+        if QUIT_SIGNAL.exists():
+            try: QUIT_SIGNAL.unlink(missing_ok=True)
+            except Exception: pass
+            self._closing = True
+            self._stop_tray()
+            self.after(0, self._full_quit)
+            return
+        self.after(1000, self._check_quit_signal)
+
     def _on_close(self):
         if self._settings.get("minimize_to_tray", True) and not self._closing:
             self.withdraw()
@@ -1246,5 +1278,13 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
+    if not _ensure_single_instance():
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "FortiProxy is already running.\nCheck the system tray icon.",
+            "FortiProxy",
+            0x40 | 0x1000,  # MB_ICONINFORMATION | MB_SETFOREGROUND
+        )
+        sys.exit(0)
     threading.Thread(target=_install_start_menu, daemon=True).start()
     App().mainloop()
