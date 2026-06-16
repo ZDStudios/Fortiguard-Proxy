@@ -19,7 +19,6 @@ from datetime import datetime
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-# SSL context that skips cert verification — handles school HTTPS inspection (MITM)
 _SSL_CTX = ssl.create_default_context()
 _SSL_CTX.check_hostname = False
 _SSL_CTX.verify_mode    = ssl.CERT_NONE
@@ -27,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V11"
+APP_VERSION   = "V12"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -38,6 +37,154 @@ NODE_EXE      = NODE_DIR / "node.exe"
 SETTINGS_FILE = Path(APPDATA) / "FortiProxy" / "settings.json"
 UPDATE_URL    = "https://zdstudios.github.io/Fortiguard-Proxy/update.bat"
 
+# ── Colour themes ─────────────────────────────────────────────────────────────
+
+THEMES = {
+    "Cyber Blue": {
+        "accent":     "#00d4ff",
+        "bg":         "#08080f",
+        "bg_hdr":     "#04040c",
+        "bg_card":    "#0d0d1e",
+        "bg_log":     "#06060e",
+        "bg_btn":     "#151528",
+        "bg_btn_hov": "#1f1f3a",
+        "bg_stop":    "#1a1a2e",
+        "text":       "#ccccee",
+        "text_dim":   "#aaaacc",
+        "dim":        "#333355",
+        "dim2":       "#22223a",
+        "offline":    "#2a2a44",
+        "connected":  "#00ff88",
+        "conn_dim":   "#006633",
+        "start_fg":   "#005c2e",
+        "start_hov":  "#008040",
+        "stop_fg":    "#5c0000",
+        "stop_hov":   "#880000",
+        "warn":       "#ffaa00",
+        "error":      "#ff3355",
+        "switch":     "#00d4ff",
+    },
+    "Matrix Green": {
+        "accent":     "#00ff88",
+        "bg":         "#030d06",
+        "bg_hdr":     "#010804",
+        "bg_card":    "#071508",
+        "bg_log":     "#020a04",
+        "bg_btn":     "#0d2210",
+        "bg_btn_hov": "#143018",
+        "bg_stop":    "#0a1a0c",
+        "text":       "#cceecc",
+        "text_dim":   "#88bb88",
+        "dim":        "#1a4020",
+        "dim2":       "#0f2a14",
+        "offline":    "#1a3020",
+        "connected":  "#00ff88",
+        "conn_dim":   "#006633",
+        "start_fg":   "#005c2e",
+        "start_hov":  "#008040",
+        "stop_fg":    "#5c0000",
+        "stop_hov":   "#880000",
+        "warn":       "#ffdd00",
+        "error":      "#ff4455",
+        "switch":     "#00ff88",
+    },
+    "Crimson Red": {
+        "accent":     "#ff3355",
+        "bg":         "#0f0305",
+        "bg_hdr":     "#0a0203",
+        "bg_card":    "#1a050a",
+        "bg_log":     "#0c0204",
+        "bg_btn":     "#2a0810",
+        "bg_btn_hov": "#3a1020",
+        "bg_stop":    "#1a0508",
+        "text":       "#eecccc",
+        "text_dim":   "#cc8888",
+        "dim":        "#44101a",
+        "dim2":       "#2a0810",
+        "offline":    "#3a1020",
+        "connected":  "#ff6688",
+        "conn_dim":   "#660022",
+        "start_fg":   "#800020",
+        "start_hov":  "#aa0030",
+        "stop_fg":    "#5c2e00",
+        "stop_hov":   "#804000",
+        "warn":       "#ffaa00",
+        "error":      "#ff6600",
+        "switch":     "#ff3355",
+    },
+    "Purple Haze": {
+        "accent":     "#b366ff",
+        "bg":         "#07030f",
+        "bg_hdr":     "#04010a",
+        "bg_card":    "#10071e",
+        "bg_log":     "#05020c",
+        "bg_btn":     "#1c0e33",
+        "bg_btn_hov": "#281444",
+        "bg_stop":    "#150a28",
+        "text":       "#ddccee",
+        "text_dim":   "#aa88cc",
+        "dim":        "#2d1a44",
+        "dim2":       "#1e1033",
+        "offline":    "#281a44",
+        "connected":  "#bb88ff",
+        "conn_dim":   "#440080",
+        "start_fg":   "#3d0080",
+        "start_hov":  "#5500aa",
+        "stop_fg":    "#5c0040",
+        "stop_hov":   "#880055",
+        "warn":       "#ffaa00",
+        "error":      "#ff3355",
+        "switch":     "#b366ff",
+    },
+    "Solar Orange": {
+        "accent":     "#ff8800",
+        "bg":         "#0f0700",
+        "bg_hdr":     "#0a0400",
+        "bg_card":    "#1a0e00",
+        "bg_log":     "#0c0600",
+        "bg_btn":     "#2a1800",
+        "bg_btn_hov": "#3a2200",
+        "bg_stop":    "#1a1000",
+        "text":       "#eeddcc",
+        "text_dim":   "#cc9966",
+        "dim":        "#3d2200",
+        "dim2":       "#2a1800",
+        "offline":    "#3a2000",
+        "connected":  "#ffaa44",
+        "conn_dim":   "#664400",
+        "start_fg":   "#5c2e00",
+        "start_hov":  "#804000",
+        "stop_fg":    "#5c0000",
+        "stop_hov":   "#880000",
+        "warn":       "#ffdd00",
+        "error":      "#ff3355",
+        "switch":     "#ff8800",
+    },
+    "Ice White": {
+        "accent":     "#88ddff",
+        "bg":         "#08081a",
+        "bg_hdr":     "#05050f",
+        "bg_card":    "#10101e",
+        "bg_log":     "#060610",
+        "bg_btn":     "#1a1a2e",
+        "bg_btn_hov": "#252538",
+        "bg_stop":    "#161626",
+        "text":       "#ddeeff",
+        "text_dim":   "#99aacc",
+        "dim":        "#252540",
+        "dim2":       "#1a1a33",
+        "offline":    "#252544",
+        "connected":  "#aaffdd",
+        "conn_dim":   "#005544",
+        "start_fg":   "#004466",
+        "start_hov":  "#006688",
+        "stop_fg":    "#440022",
+        "stop_hov":   "#660033",
+        "warn":       "#ffcc44",
+        "error":      "#ff4466",
+        "switch":     "#88ddff",
+    },
+}
 
 # ── Settings persistence ──────────────────────────────────────────────────────
 
@@ -48,7 +195,8 @@ def _load_settings() -> dict:
     except Exception:
         pass
     return {"start_on_boot": False, "minimize_to_tray": True,
-            "launch_minimized": False, "auto_connect": False, "auto_update": True}
+            "launch_minimized": False, "auto_connect": False,
+            "auto_update": True, "theme": "Cyber Blue"}
 
 
 def _save_settings(data: dict):
@@ -59,14 +207,29 @@ def _save_settings(data: dict):
         pass
 
 
+def _get_theme(settings: dict | None = None) -> dict:
+    s = settings or _load_settings()
+    return THEMES.get(s.get("theme", "Cyber Blue"), THEMES["Cyber Blue"])
+
+
+# Active theme palette — loaded once at startup, used everywhere
+_T = _get_theme()
+
+
+def _hex_rgb(h: str) -> tuple:
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+
 # ── Tray icon image ───────────────────────────────────────────────────────────
 
 def _make_tray_image(connected: bool = False) -> Image.Image:
     img  = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    outer = (0, 212, 255, 255) if not connected else (0, 255, 136, 255)
+    outer = (*_hex_rgb(_T["connected"] if connected else _T["accent"]), 255)
+    bg    = (*_hex_rgb(_T["bg"]), 255)
     draw.ellipse([2, 2, 62, 62], fill=outer)
-    draw.ellipse([9, 9, 55, 55], fill=(8, 8, 15, 255))
+    draw.ellipse([9, 9, 55, 55], fill=bg)
     draw.ellipse([24, 24, 40, 40], fill=outer)
     return img
 
@@ -85,11 +248,12 @@ def _get_boot_enabled() -> bool:
 
 def _set_boot_enabled(enabled: bool):
     if not getattr(sys, "frozen", False):
-        return  # only makes sense for the compiled EXE
+        return
     try:
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, BOOT_REG, 0, winreg.KEY_WRITE)
         if enabled:
-            winreg.SetValueEx(k, "FortiProxy", 0, winreg.REG_SZ, str(Path(sys.executable).resolve()))
+            winreg.SetValueEx(k, "FortiProxy", 0, winreg.REG_SZ,
+                              str(Path(sys.executable).resolve()))
         else:
             try: winreg.DeleteValue(k, "FortiProxy")
             except OSError: pass
@@ -98,7 +262,7 @@ def _set_boot_enabled(enabled: bool):
         pass
 
 
-# ── Emergency cleanup — runs on ANY Python exit (crash, close, kill) ──────────
+# ── Emergency cleanup ─────────────────────────────────────────────────────────
 
 @atexit.register
 def _proxy_emergency_off():
@@ -181,16 +345,16 @@ class App(ctk.CTk):
         self.title("FortiProxy")
         self.geometry("580x580")
         self.resizable(False, False)
-        self.configure(fg_color="#08080f")
+        self.configure(fg_color=_T["bg"])
 
-        self._proc         = None
-        self._connected    = False
-        self._start_time   = None
-        self._pulse_job    = None
-        self._pulse_on     = False
-        self._closing      = False
-        self._blocked      = False
-        self._retry_job    = None
+        self._proc              = None
+        self._connected         = False
+        self._start_time        = None
+        self._pulse_job         = None
+        self._pulse_on          = False
+        self._closing           = False
+        self._blocked           = False
+        self._retry_job         = None
         self._tray              = None
         self._tray_hidden       = False
         self._settings_win      = None
@@ -203,22 +367,17 @@ class App(ctk.CTk):
         _proxy_emergency_off()
         threading.Thread(target=_kill_stale_proxy, daemon=True).start()
 
-        # Start tray icon if enabled
         if self._settings.get("minimize_to_tray", True):
             threading.Thread(target=self._build_tray, daemon=True).start()
 
-        # Launch minimized
         if self._settings.get("launch_minimized", False):
             self.after(100, self.withdraw)
 
         self._log("Dashboard ready", "dim")
         self._ping_server()
         self.after(1500, self._check_update)
-
-        # Auto-update check (runs after server ping settles)
         self.after(3000, self._auto_check_update)
 
-        # Auto-connect
         if self._settings.get("auto_connect", False):
             self.after(5000, self._start)
 
@@ -234,14 +393,12 @@ class App(ctk.CTk):
             pystray.MenuItem("Quit", self._quit_app),
         )
         self._tray = pystray.Icon("FortiProxy", _make_tray_image(), "FortiProxy", menu)
-        self._tray.run()  # blocks until tray.stop() is called
+        self._tray.run()
 
     def _stop_tray(self):
         if self._tray:
-            try:
-                self._tray.stop()
-            except Exception:
-                pass
+            try: self._tray.stop()
+            except Exception: pass
             self._tray = None
 
     def _show_window(self, icon=None, item=None):
@@ -272,47 +429,46 @@ class App(ctk.CTk):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
-        hdr = ctk.CTkFrame(self, fg_color="#04040c", corner_radius=0, height=60)
+        hdr = ctk.CTkFrame(self, fg_color=_T["bg_hdr"], corner_radius=0, height=60)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
         ctk.CTkLabel(
             hdr, text="  \U0001f6e1  FORTIPROXY",
             font=ctk.CTkFont("Consolas", 21, "bold"),
-            text_color="#00d4ff",
+            text_color=_T["accent"],
         ).pack(side="left", padx=20)
 
-        # Refresh button (rightmost)
         self._refresh_btn = ctk.CTkButton(
             hdr, text="↻", width=34, height=34,
             font=ctk.CTkFont("Consolas", 16),
-            fg_color="#151528", hover_color="#1f1f3a",
+            fg_color=_T["bg_btn"], hover_color=_T["bg_btn_hov"],
             corner_radius=8, command=self._ping_server,
         )
         self._refresh_btn.pack(side="right", padx=(4, 14))
 
-        # Settings button (⚙)
         ctk.CTkButton(
             hdr, text="⚙", width=34, height=34,
             font=ctk.CTkFont("Consolas", 16),
-            fg_color="#151528", hover_color="#1f1f3a",
+            fg_color=_T["bg_btn"], hover_color=_T["bg_btn_hov"],
             corner_radius=8, command=self._open_settings,
         ).pack(side="right", padx=4)
 
         ctk.CTkLabel(
             hdr, text=f"{APP_VERSION}  ",
             font=ctk.CTkFont("Consolas", 11),
-            text_color="#22223a",
+            text_color=_T["dim2"],
         ).pack(side="right")
 
-        card = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
+        card = ctk.CTkFrame(self, fg_color=_T["bg_card"], corner_radius=14)
         card.pack(fill="x", padx=18, pady=(14, 6))
 
-        self._server_dot = self._srow(card, "RENDER SERVER", "● CHECKING", "#ffaa00")
+        self._server_dot = self._srow(card, "RENDER SERVER", "● CHECKING", _T["warn"])
         self._sep(card)
-        self._tunnel_dot = self._srow(card, "TUNNEL",        "● OFFLINE",  "#2a2a44")
+        self._tunnel_dot = self._srow(card, "TUNNEL",        "● OFFLINE",  _T["offline"])
         self._sep(card)
-        self._uptime_lbl = self._srow(card, "UPTIME",        "--:--:--",   "#2a2a44", bold=False)
+        self._uptime_lbl = self._srow(card, "UPTIME",        "--:--:--",   _T["offline"],
+                                      bold=False)
 
         bf = ctk.CTkFrame(self, fg_color="transparent")
         bf.pack(fill="x", padx=18, pady=8)
@@ -321,7 +477,7 @@ class App(ctk.CTk):
         self._start_btn = ctk.CTkButton(
             bf, text="▶   START", height=52, corner_radius=10,
             font=ctk.CTkFont("Consolas", 14, "bold"),
-            fg_color="#005c2e", hover_color="#008040",
+            fg_color=_T["start_fg"], hover_color=_T["start_hov"],
             command=self._start,
         )
         self._start_btn.grid(row=0, column=0, padx=(0, 7), sticky="ew")
@@ -329,45 +485,45 @@ class App(ctk.CTk):
         self._stop_btn = ctk.CTkButton(
             bf, text="■   DISCONNECT", height=52, corner_radius=10,
             font=ctk.CTkFont("Consolas", 14, "bold"),
-            fg_color="#1a1a2e", hover_color="#1a1a2e",
+            fg_color=_T["bg_stop"], hover_color=_T["bg_stop"],
             state="disabled", command=self._stop,
         )
         self._stop_btn.grid(row=0, column=1, padx=(7, 0), sticky="ew")
 
-        lf = ctk.CTkFrame(self, fg_color="#0d0d1e", corner_radius=14)
+        lf = ctk.CTkFrame(self, fg_color=_T["bg_card"], corner_radius=14)
         lf.pack(fill="both", expand=True, padx=18, pady=(6, 16))
 
         top = ctk.CTkFrame(lf, fg_color="transparent")
         top.pack(fill="x", padx=14, pady=(10, 2))
         ctk.CTkLabel(top, text="ACTIVITY LOG",
                      font=ctk.CTkFont("Consolas", 10),
-                     text_color="#22223a").pack(side="left")
+                     text_color=_T["dim2"]).pack(side="left")
         ctk.CTkButton(top, text="clear", width=42, height=20,
                       font=ctk.CTkFont("Consolas", 10),
-                      fg_color="transparent", hover_color="#141428",
-                      text_color="#333355",
+                      fg_color="transparent", hover_color=_T["bg_btn"],
+                      text_color=_T["dim"],
                       command=self._clear_log).pack(side="right")
 
         self._logbox = ctk.CTkTextbox(
             lf, font=ctk.CTkFont("Consolas", 11),
-            fg_color="#06060e", text_color="#00ff88",
+            fg_color=_T["bg_log"], text_color=_T["connected"],
             corner_radius=10, state="disabled", wrap="word",
         )
         self._logbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
         tb = self._logbox._textbox
-        tb.tag_config("ok",    foreground="#00ff88")
-        tb.tag_config("dim",   foreground="#333355")
-        tb.tag_config("info",  foreground="#aaaacc")
-        tb.tag_config("warn",  foreground="#ffaa00")
-        tb.tag_config("error", foreground="#ff3355")
+        tb.tag_config("ok",    foreground=_T["connected"])
+        tb.tag_config("dim",   foreground=_T["dim"])
+        tb.tag_config("info",  foreground=_T["text_dim"])
+        tb.tag_config("warn",  foreground=_T["warn"])
+        tb.tag_config("error", foreground=_T["error"])
 
     def _srow(self, parent, label, value, color, bold=True):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=18, pady=8)
         ctk.CTkLabel(row, text=label,
                      font=ctk.CTkFont("Consolas", 11),
-                     text_color="#333355", width=140, anchor="w").pack(side="left")
+                     text_color=_T["dim"], width=140, anchor="w").pack(side="left")
         lbl = ctk.CTkLabel(row, text=value,
                            font=ctk.CTkFont("Consolas", 11, "bold" if bold else "normal"),
                            text_color=color)
@@ -375,7 +531,7 @@ class App(ctk.CTk):
         return lbl
 
     def _sep(self, parent):
-        ctk.CTkFrame(parent, fg_color="#151528", height=1,
+        ctk.CTkFrame(parent, fg_color=_T["bg_btn"], height=1,
                      corner_radius=0).pack(fill="x", padx=16)
 
     # ── Settings window ───────────────────────────────────────────────────────
@@ -387,24 +543,77 @@ class App(ctk.CTk):
 
         win = ctk.CTkToplevel(self)
         win.title("Settings — FortiProxy")
-        win.geometry("380x520")
+        win.geometry("400x600")
         win.resizable(False, False)
-        win.configure(fg_color="#08080f")
+        win.configure(fg_color=_T["bg"])
         win.transient(self)
         self._settings_win = win
 
-        # Header
-        hdr = ctk.CTkFrame(win, fg_color="#04040c", corner_radius=0, height=50)
+        hdr = ctk.CTkFrame(win, fg_color=_T["bg_hdr"], corner_radius=0, height=50)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="  ⚙  SETTINGS",
                      font=ctk.CTkFont("Consolas", 16, "bold"),
-                     text_color="#00d4ff").pack(side="left", padx=16)
+                     text_color=_T["accent"]).pack(side="left", padx=16)
 
-        scroll = ctk.CTkScrollableFrame(win, fg_color="#08080f",
-                                        scrollbar_button_color="#151528",
-                                        scrollbar_button_hover_color="#1f1f3a")
-        scroll.pack(fill="both", expand=True, padx=0, pady=0)
+        scroll = ctk.CTkScrollableFrame(win, fg_color=_T["bg"],
+                                        scrollbar_button_color=_T["bg_btn"],
+                                        scrollbar_button_hover_color=_T["bg_btn_hov"])
+        scroll.pack(fill="both", expand=True)
+
+        # ── APPEARANCE ──
+        self._sw_section(scroll, "APPEARANCE")
+
+        theme_card = ctk.CTkFrame(scroll, fg_color=_T["bg_card"], corner_radius=10)
+        theme_card.pack(fill="x", padx=16, pady=(4, 8))
+
+        # Dropdown row
+        th_row = ctk.CTkFrame(theme_card, fg_color="transparent")
+        th_row.pack(fill="x", padx=14, pady=(12, 6))
+        ctk.CTkLabel(th_row, text="Colour scheme",
+                     font=ctk.CTkFont("Consolas", 12, "bold"),
+                     text_color=_T["text"], anchor="w").pack(side="left")
+
+        current_theme = self._settings.get("theme", "Cyber Blue")
+        theme_menu = ctk.CTkOptionMenu(
+            th_row,
+            values=list(THEMES.keys()),
+            fg_color=_T["bg_btn"],
+            button_color=_T["accent"],
+            button_hover_color=_T["bg_btn_hov"],
+            dropdown_fg_color=_T["bg_card"],
+            text_color=_T["text"],
+            font=ctk.CTkFont("Consolas", 11),
+            command=self._change_theme,
+            width=170,
+        )
+        theme_menu.set(current_theme)
+        theme_menu.pack(side="right")
+
+        # Colour swatches
+        sw_row = ctk.CTkFrame(theme_card, fg_color="transparent")
+        sw_row.pack(fill="x", padx=14, pady=(2, 8))
+        ctk.CTkLabel(sw_row, text="Quick pick  ",
+                     font=ctk.CTkFont("Consolas", 9),
+                     text_color=_T["dim"]).pack(side="left")
+        for name, palette in THEMES.items():
+            tip = name
+            btn = ctk.CTkButton(
+                sw_row, text="", width=26, height=26,
+                corner_radius=13,
+                fg_color=palette["accent"],
+                hover_color=palette["connected"],
+                border_width=2 if name == current_theme else 0,
+                border_color="#ffffff",
+                command=lambda n=name, m=theme_menu: (self._change_theme(n), m.set(n)),
+            )
+            btn.pack(side="left", padx=3)
+
+        self._theme_note = ctk.CTkLabel(
+            theme_card, text="Choose a scheme above, then restart to apply",
+            font=ctk.CTkFont("Consolas", 9),
+            text_color=_T["dim"])
+        self._theme_note.pack(padx=14, pady=(0, 10), anchor="w")
 
         # ── STARTUP ──
         self._sw_section(scroll, "STARTUP")
@@ -412,14 +621,12 @@ class App(ctk.CTk):
         boot_var = ctk.BooleanVar(value=_get_boot_enabled())
         self._sw_row(scroll, "Start on boot",
                      "Launch FortiProxy automatically when Windows starts",
-                     boot_var,
-                     lambda v: self._toggle_boot(v))
+                     boot_var, lambda v: self._toggle_boot(v))
 
         min_var = ctk.BooleanVar(value=self._settings.get("launch_minimized", False))
         self._sw_row(scroll, "Launch minimized",
                      "Start hidden to tray instead of showing the window",
-                     min_var,
-                     lambda v: self._save_setting("launch_minimized", v))
+                     min_var, lambda v: self._save_setting("launch_minimized", v))
 
         # ── SYSTEM TRAY ──
         self._sw_section(scroll, "SYSTEM TRAY")
@@ -427,8 +634,7 @@ class App(ctk.CTk):
         tray_var = ctk.BooleanVar(value=self._settings.get("minimize_to_tray", True))
         self._sw_row(scroll, "Minimize to tray on close",
                      "Keep running in the taskbar tray instead of exiting",
-                     tray_var,
-                     lambda v: self._toggle_tray(v))
+                     tray_var, lambda v: self._toggle_tray(v))
 
         # ── CONNECTION ──
         self._sw_section(scroll, "CONNECTION")
@@ -436,8 +642,7 @@ class App(ctk.CTk):
         auto_var = ctk.BooleanVar(value=self._settings.get("auto_connect", False))
         self._sw_row(scroll, "Auto-connect on launch",
                      "Start the tunnel automatically when FortiProxy opens",
-                     auto_var,
-                     lambda v: self._save_setting("auto_connect", v))
+                     auto_var, lambda v: self._save_setting("auto_connect", v))
 
         # ── UPDATES ──
         self._sw_section(scroll, "UPDATES")
@@ -445,24 +650,23 @@ class App(ctk.CTk):
         auto_upd_var = ctk.BooleanVar(value=self._settings.get("auto_update", True))
         self._sw_row(scroll, "Auto-update check",
                      "Check for new versions automatically each time FortiProxy opens",
-                     auto_upd_var,
-                     lambda v: self._save_setting("auto_update", v))
+                     auto_upd_var, lambda v: self._save_setting("auto_update", v))
 
-        ver_card = ctk.CTkFrame(scroll, fg_color="#0d0d1e", corner_radius=10)
+        ver_card = ctk.CTkFrame(scroll, fg_color=_T["bg_card"], corner_radius=10)
         ver_card.pack(fill="x", padx=16, pady=(4, 12))
 
         ver_row = ctk.CTkFrame(ver_card, fg_color="transparent")
         ver_row.pack(fill="x", padx=14, pady=(12, 4))
         ctk.CTkLabel(ver_row, text="Installed version",
-                     font=ctk.CTkFont("Consolas", 11), text_color="#333355",
-                     anchor="w").pack(side="left")
+                     font=ctk.CTkFont("Consolas", 11),
+                     text_color=_T["dim"], anchor="w").pack(side="left")
         ctk.CTkLabel(ver_row, text=APP_VERSION,
                      font=ctk.CTkFont("Consolas", 11, "bold"),
-                     text_color="#aaaacc").pack(side="right")
+                     text_color=_T["text_dim"]).pack(side="right")
 
         self._upd_lbl = ctk.CTkLabel(ver_card, text="",
                                       font=ctk.CTkFont("Consolas", 11),
-                                      text_color="#333355")
+                                      text_color=_T["dim"])
         self._upd_lbl.pack(padx=14, anchor="w")
 
         btn_row = ctk.CTkFrame(ver_card, fg_color="transparent")
@@ -470,14 +674,14 @@ class App(ctk.CTk):
 
         ctk.CTkButton(btn_row, text="Check for Updates", height=32,
                       font=ctk.CTkFont("Consolas", 12),
-                      fg_color="#151528", hover_color="#1f1f3a",
+                      fg_color=_T["bg_btn"], hover_color=_T["bg_btn_hov"],
                       corner_radius=8,
                       command=self._check_version).pack(side="left")
 
         self._install_upd_btn = ctk.CTkButton(
             btn_row, text="↓ Install Update", height=32,
             font=ctk.CTkFont("Consolas", 12),
-            fg_color="#3d1a00", hover_color="#7a3600",
+            fg_color=_T["stop_fg"], hover_color=_T["stop_hov"],
             corner_radius=8, state="disabled",
             command=self._install_update,
         )
@@ -485,13 +689,13 @@ class App(ctk.CTk):
 
         # ── ABOUT ──
         self._sw_section(scroll, "ABOUT")
-        about_card = ctk.CTkFrame(scroll, fg_color="#0d0d1e", corner_radius=10)
+        about_card = ctk.CTkFrame(scroll, fg_color=_T["bg_card"], corner_radius=10)
         about_card.pack(fill="x", padx=16, pady=(4, 16))
         for line, color in [
-            ("FortiProxy", "#00d4ff"),
-            ("WebSocket tunnel that bypasses Fortiguard", "#aaaacc"),
-            ("filtering on managed school networks.", "#aaaacc"),
-            (f"github.com/{REPO}", "#333355"),
+            ("FortiProxy",                              _T["accent"]),
+            ("WebSocket tunnel that bypasses Fortiguard", _T["text_dim"]),
+            ("filtering on managed school networks.",   _T["text_dim"]),
+            (f"github.com/{REPO}",                     _T["dim"]),
         ]:
             ctk.CTkLabel(about_card, text=line,
                          font=ctk.CTkFont("Consolas", 10),
@@ -503,26 +707,24 @@ class App(ctk.CTk):
         f.pack(fill="x", padx=16, pady=(14, 4))
         ctk.CTkLabel(f, text=title,
                      font=ctk.CTkFont("Consolas", 10, "bold"),
-                     text_color="#22223a").pack(side="left")
-        ctk.CTkFrame(f, fg_color="#151528", height=1).pack(
+                     text_color=_T["dim2"]).pack(side="left")
+        ctk.CTkFrame(f, fg_color=_T["bg_btn"], height=1).pack(
             side="left", fill="x", expand=True, padx=(8, 0), pady=1)
 
     def _sw_row(self, parent, title: str, desc: str, var: ctk.BooleanVar, callback):
-        card = ctk.CTkFrame(parent, fg_color="#0d0d1e", corner_radius=10)
+        card = ctk.CTkFrame(parent, fg_color=_T["bg_card"], corner_radius=10)
         card.pack(fill="x", padx=16, pady=3)
-
         left = ctk.CTkFrame(card, fg_color="transparent")
         left.pack(side="left", fill="both", expand=True, padx=14, pady=10)
         ctk.CTkLabel(left, text=title,
                      font=ctk.CTkFont("Consolas", 12, "bold"),
-                     text_color="#ccccee", anchor="w").pack(anchor="w")
+                     text_color=_T["text"], anchor="w").pack(anchor="w")
         ctk.CTkLabel(left, text=desc,
                      font=ctk.CTkFont("Consolas", 9),
-                     text_color="#333355", anchor="w", wraplength=220).pack(anchor="w")
-
+                     text_color=_T["dim"], anchor="w", wraplength=220).pack(anchor="w")
         sw = ctk.CTkSwitch(card, text="", variable=var,
                            onvalue=True, offvalue=False,
-                           progress_color="#00d4ff",
+                           progress_color=_T["switch"],
                            command=lambda: callback(var.get()))
         sw.pack(side="right", padx=14)
 
@@ -531,6 +733,16 @@ class App(ctk.CTk):
     def _save_setting(self, key: str, val):
         self._settings[key] = val
         _save_settings(self._settings)
+
+    def _change_theme(self, name: str):
+        if name not in THEMES:
+            return
+        self._save_setting("theme", name)
+        if hasattr(self, "_theme_note") and self._theme_note.winfo_exists():
+            self._theme_note.configure(
+                text=f"'{name}' saved — restart FortiProxy to apply",
+                text_color=_T["warn"])
+        self._tlog(f"Theme set to {name} — restart FortiProxy to apply", "warn")
 
     def _toggle_boot(self, enabled: bool):
         self._save_setting("start_on_boot", enabled)
@@ -550,8 +762,8 @@ class App(ctk.CTk):
             self._tlog("System tray icon disabled", "ok")
 
     def _check_version(self):
-        if hasattr(self, "_upd_lbl"):
-            self._upd_lbl.configure(text="Checking...", text_color="#ffaa00")
+        if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
+            self._upd_lbl.configure(text="Checking...", text_color=_T["warn"])
 
         def _run():
             try:
@@ -565,7 +777,6 @@ class App(ctk.CTk):
                 if not latest:
                     raise RuntimeError("No release tag found")
 
-                # Compare V-numbers numerically (V9 → 9, V10 → 10)
                 def vnum(s):
                     try: return int(s.lstrip("Vv"))
                     except ValueError: return 0
@@ -573,21 +784,18 @@ class App(ctk.CTk):
                 if vnum(latest) > vnum(APP_VERSION):
                     asset = next(
                         (a for a in data.get("assets", [])
-                         if a.get("name", "").endswith(".zip")),
-                        None,
-                    )
+                         if a.get("name", "").endswith(".zip")), None)
                     self._update_download_url = (
-                        asset["browser_download_url"] if asset else None
-                    )
-                    msg = f"● {latest} available!"
-                    color = "#ffaa00"
+                        asset["browser_download_url"] if asset else None)
+                    msg   = f"● {latest} available!"
+                    color = _T["warn"]
                     self._tlog(f"Update available: {latest} (you have {APP_VERSION})", "warn")
                     if hasattr(self, "_install_upd_btn") and self._install_upd_btn.winfo_exists():
                         self.after(0, lambda: self._install_upd_btn.configure(state="normal"))
                 else:
                     self._update_download_url = None
-                    msg = f"● Up to date ({APP_VERSION})"
-                    color = "#00ff88"
+                    msg   = f"● Up to date ({APP_VERSION})"
+                    color = _T["connected"]
                     if hasattr(self, "_install_upd_btn") and self._install_upd_btn.winfo_exists():
                         self.after(0, lambda: self._install_upd_btn.configure(state="disabled"))
 
@@ -596,7 +804,7 @@ class App(ctk.CTk):
             except Exception as e:
                 if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
                     self.after(0, lambda: self._upd_lbl.configure(
-                        text=f"Check failed ({e})", text_color="#ff3355"))
+                        text=f"Check failed ({e})", text_color=_T["error"]))
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -613,16 +821,14 @@ class App(ctk.CTk):
                 self._tlog("Downloading update...", "info")
                 req = urllib.request.Request(
                     self._update_download_url,
-                    headers={"User-Agent": "FortiProxy/2.0"},
-                )
+                    headers={"User-Agent": "FortiProxy/2.0"})
                 with urllib.request.urlopen(req, timeout=300, context=_SSL_CTX) as r:
                     total    = int(r.headers.get("Content-Length", 0))
                     data     = bytearray()
                     last_pct = -1
                     while True:
                         chunk = r.read(131072)
-                        if not chunk:
-                            break
+                        if not chunk: break
                         data.extend(chunk)
                         if total:
                             pct = (len(data) * 100 // total) // 10 * 10
@@ -639,12 +845,8 @@ class App(ctk.CTk):
                 if not bat.exists():
                     raise RuntimeError("install.bat not found in update package")
 
-                subprocess.Popen(
-                    ["cmd", "/c", str(bat)],
-                    cwd=str(tmp),
-                    creationflags=0x00000010,  # CREATE_NEW_CONSOLE — shows install window
-                )
-                # Delete temp folder when Python exits (by then install.bat has finished copying)
+                subprocess.Popen(["cmd", "/c", str(bat)], cwd=str(tmp),
+                                 creationflags=0x00000010)
                 atexit.register(shutil.rmtree, str(tmp), True)
                 self._tlog("Installer launched — FortiProxy will restart", "ok")
                 self.after(2000, self._full_quit)
@@ -680,12 +882,9 @@ class App(ctk.CTk):
                 if vnum(latest) > vnum(APP_VERSION):
                     asset = next(
                         (a for a in data.get("assets", [])
-                         if a.get("name", "").endswith(".zip")),
-                        None,
-                    )
+                         if a.get("name", "").endswith(".zip")), None)
                     self._update_download_url = (
-                        asset["browser_download_url"] if asset else None
-                    )
+                        asset["browser_download_url"] if asset else None)
                     self.after(0, lambda: self._show_update_prompt(latest))
             except Exception:
                 pass
@@ -699,7 +898,7 @@ class App(ctk.CTk):
         dialog.title("Update Available")
         dialog.geometry("360x170")
         dialog.resizable(False, False)
-        dialog.configure(fg_color="#08080f")
+        dialog.configure(fg_color=_T["bg"])
         dialog.transient(self)
         dialog.grab_set()
         dialog.lift()
@@ -707,11 +906,11 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(dialog, text="Update Available",
                      font=ctk.CTkFont("Consolas", 15, "bold"),
-                     text_color="#00d4ff").pack(pady=(22, 6))
+                     text_color=_T["accent"]).pack(pady=(22, 6))
         ctk.CTkLabel(dialog,
                      text=f"Version {version} is available.\nWould you like to update now?",
                      font=ctk.CTkFont("Consolas", 11),
-                     text_color="#aaaacc").pack(pady=(0, 18))
+                     text_color=_T["text_dim"]).pack(pady=(0, 18))
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack()
@@ -722,11 +921,11 @@ class App(ctk.CTk):
 
         ctk.CTkButton(btn_row, text="Update Now", width=130, height=36,
                       font=ctk.CTkFont("Consolas", 12, "bold"),
-                      fg_color="#005c2e", hover_color="#008040",
+                      fg_color=_T["start_fg"], hover_color=_T["start_hov"],
                       command=_do_update).pack(side="left", padx=(0, 8))
         ctk.CTkButton(btn_row, text="Later", width=80, height=36,
                       font=ctk.CTkFont("Consolas", 12),
-                      fg_color="#151528", hover_color="#1f1f3a",
+                      fg_color=_T["bg_btn"], hover_color=_T["bg_btn_hov"],
                       command=dialog.destroy).pack(side="left")
 
     # ── Logging ───────────────────────────────────────────────────────────────
@@ -755,7 +954,8 @@ class App(ctk.CTk):
         def _run():
             import tempfile
             try:
-                req = urllib.request.Request(UPDATE_URL, headers={"User-Agent": "FortiProxy/2.0"})
+                req = urllib.request.Request(UPDATE_URL,
+                                             headers={"User-Agent": "FortiProxy/2.0"})
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     content = resp.read().decode("utf-8", errors="replace")
                 runnable = [ln for ln in content.splitlines()
@@ -766,14 +966,9 @@ class App(ctk.CTk):
                 tmp.write_text(content, encoding="utf-8")
                 exe_dir = (str(Path(sys.executable).parent) if getattr(sys, "frozen", False)
                            else str(Path(__file__).parent.parent))
-                subprocess.Popen(
-                    ["cmd", "/c", str(tmp)],
-                    cwd=exe_dir,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=0x00000010,
-                )
+                subprocess.Popen(["cmd", "/c", str(tmp)], cwd=exe_dir,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, creationflags=0x00000010)
             except Exception:
                 pass
         threading.Thread(target=_run, daemon=True).start()
@@ -782,7 +977,7 @@ class App(ctk.CTk):
         if self._retry_job:
             self.after_cancel(self._retry_job)
             self._retry_job = None
-        self._server_dot.configure(text="● CHECKING", text_color="#ffaa00")
+        self._server_dot.configure(text="● CHECKING", text_color=_T["warn"])
         self._refresh_btn.configure(state="disabled")
         self._tlog("Pinging Render server...", "dim")
 
@@ -790,14 +985,13 @@ class App(ctk.CTk):
             try:
                 urllib.request.urlopen(
                     urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
-                    timeout=12, context=_SSL_CTX,
-                )
+                    timeout=12, context=_SSL_CTX)
                 self.after(0, lambda: self._server_dot.configure(
-                    text="● ONLINE", text_color="#00ff88"))
+                    text="● ONLINE", text_color=_T["connected"]))
                 self._tlog("Render server is online", "ok")
             except Exception as e:
                 self.after(0, lambda: self._server_dot.configure(
-                    text="● OFFLINE", text_color="#ff3355"))
+                    text="● OFFLINE", text_color=_T["error"]))
                 self._tlog(f"Server unreachable ({e}) — retrying in 15s", "warn")
                 self._retry_job = self.after(15000, self._ping_server)
             finally:
@@ -854,13 +1048,10 @@ class App(ctk.CTk):
         found = shutil.which("node")
         if found:
             return found
-
         self._tlog("Node.js not found — downloading portable version (~28 MB)...", "warn")
         try:
-            req = urllib.request.Request(
-                "https://nodejs.org/dist/index.json",
-                headers={"User-Agent": "FortiProxy/2.0"},
-            )
+            req = urllib.request.Request("https://nodejs.org/dist/index.json",
+                                         headers={"User-Agent": "FortiProxy/2.0"})
             with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as r:
                 releases = json.loads(r.read())
             lts = next((rel for rel in releases if rel.get("lts")), None)
@@ -869,7 +1060,6 @@ class App(ctk.CTk):
             version = lts["version"]
             url = f"https://nodejs.org/dist/{version}/node-{version}-win-x64.zip"
             self._tlog(f"Downloading Node.js {version}...", "info")
-
             req = urllib.request.Request(url, headers={"User-Agent": "FortiProxy/2.0"})
             with urllib.request.urlopen(req, timeout=300, context=_SSL_CTX) as r:
                 total    = int(r.headers.get("Content-Length", 0))
@@ -877,20 +1067,17 @@ class App(ctk.CTk):
                 last_pct = -1
                 while True:
                     chunk = r.read(131072)
-                    if not chunk:
-                        break
+                    if not chunk: break
                     data.extend(chunk)
                     if total:
                         pct = (len(data) * 100 // total) // 10 * 10
                         if pct != last_pct:
                             self._tlog(f"Downloading... {pct}%", "dim")
                             last_pct = pct
-
             NODE_DIR.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(io.BytesIO(bytes(data))) as zf:
                 entry = next(n for n in zf.namelist() if n.endswith("/node.exe"))
                 NODE_EXE.write_bytes(zf.read(entry))
-
             self._tlog(f"Node.js {version} ready", "ok")
             return str(NODE_EXE)
         except Exception as e:
@@ -898,15 +1085,14 @@ class App(ctk.CTk):
 
     def _start(self):
         self._start_btn.configure(state="disabled", text="  CONNECTING...")
-        self._tunnel_dot.configure(text="● CONNECTING", text_color="#ffaa00")
+        self._tunnel_dot.configure(text="● CONNECTING", text_color=_T["warn"])
 
         def _run():
             self._tlog("Checking server...", "dim")
             try:
                 urllib.request.urlopen(
                     urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
-                    timeout=12, context=_SSL_CTX,
-                )
+                    timeout=12, context=_SSL_CTX)
                 self._tlog("Server online", "ok")
             except Exception as e:
                 self._tlog(f"Server unreachable ({e}) — trying anyway", "warn")
@@ -943,14 +1129,11 @@ class App(ctk.CTk):
                 self._proc = subprocess.Popen(
                     [node, str(BASE_DIR / "client.js")],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, bufsize=1, cwd=str(BASE_DIR),
-                    **extra,
-                )
+                    text=True, bufsize=1, cwd=str(BASE_DIR), **extra)
                 self.after(0, self._on_connected)
                 for line in self._proc.stdout:
                     line = line.strip()
-                    if not line:
-                        continue
+                    if not line: continue
                     if line.startswith("FORTIPROXY_CMD:"):
                         cmd = line.split(":", 1)[1]
                         self.after(0, lambda c=cmd: self._handle_server_cmd(c))
@@ -973,13 +1156,12 @@ class App(ctk.CTk):
     def _on_connected(self):
         self._connected  = True
         self._start_time = time.time()
-        self._tunnel_dot.configure(text="● CONNECTED", text_color="#00ff88")
+        self._tunnel_dot.configure(text="● CONNECTED", text_color=_T["connected"])
         self._stop_btn.configure(state="normal",
-                                  fg_color="#5c0000", hover_color="#880000")
+                                  fg_color=_T["stop_fg"], hover_color=_T["stop_hov"])
         self._log("Tunnel active — traffic routed through Render", "ok")
         self._tick_uptime()
         self._pulse()
-        # Update tray icon to green
         if self._tray:
             try: self._tray.icon = _make_tray_image(connected=True)
             except Exception: pass
@@ -992,7 +1174,7 @@ class App(ctk.CTk):
                 self.after_cancel(self._pulse_job)
                 self._pulse_job = None
             self._disable_proxy()
-            self._tunnel_dot.configure(text="● BLOCKED", text_color="#ff3355")
+            self._tunnel_dot.configure(text="● BLOCKED", text_color=_T["error"])
             self._log("Blocked by server admin — proxy disabled", "error")
         elif cmd == "unblock":
             self._blocked = False
@@ -1005,12 +1187,11 @@ class App(ctk.CTk):
             self._pulse_job = None
         self._disable_proxy()
         if not self._blocked:
-            self._tunnel_dot.configure(text="● OFFLINE", text_color="#2a2a44")
+            self._tunnel_dot.configure(text="● OFFLINE", text_color=_T["offline"])
             self._log("Disconnected — proxy disabled", "warn")
-        self._uptime_lbl.configure(text="--:--:--", text_color="#2a2a44")
+        self._uptime_lbl.configure(text="--:--:--", text_color=_T["offline"])
         self._blocked = False
         self._reset_ui()
-        # Update tray icon back to cyan
         if self._tray:
             try: self._tray.icon = _make_tray_image(connected=False)
             except Exception: pass
@@ -1027,7 +1208,7 @@ class App(ctk.CTk):
     def _reset_ui(self):
         self._start_btn.configure(state="normal", text="▶   START")
         self._stop_btn.configure(state="disabled",
-                                  fg_color="#1a1a2e", hover_color="#1a1a2e")
+                                  fg_color=_T["bg_stop"], hover_color=_T["bg_stop"])
 
     def _tick_uptime(self):
         if not self._connected:
@@ -1035,8 +1216,7 @@ class App(ctk.CTk):
         s = int(time.time() - self._start_time)
         self._uptime_lbl.configure(
             text=f"{s//3600:02d}:{(s%3600)//60:02d}:{s%60:02d}",
-            text_color="#00d4ff",
-        )
+            text_color=_T["accent"])
         self.after(1000, self._tick_uptime)
 
     def _pulse(self):
@@ -1044,11 +1224,10 @@ class App(ctk.CTk):
             return
         self._pulse_on = not self._pulse_on
         self._tunnel_dot.configure(
-            text_color="#00ff88" if self._pulse_on else "#006633")
+            text_color=_T["connected"] if self._pulse_on else _T["conn_dim"])
         self._pulse_job = self.after(900, self._pulse)
 
     def _on_close(self):
-        # Minimize to tray instead of quitting (if enabled)
         if self._settings.get("minimize_to_tray", True) and not self._closing:
             self.withdraw()
             self._tray_hidden = True
