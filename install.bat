@@ -12,6 +12,12 @@ if not exist "%EXE%" (
 
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
+:: Kill any running FortiProxy or node so the EXE isn't locked
+echo Stopping any running FortiProxy instance...
+taskkill /IM FortiProxy.exe /F >nul 2>&1
+taskkill /IM node.exe /F >nul 2>&1
+timeout /t 2 /nobreak >nul
+
 echo Installing FortiProxy...
 copy /Y "%EXE%" "%INSTALL_DIR%\FortiProxy.exe" >nul 2>&1
 
