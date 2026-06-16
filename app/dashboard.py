@@ -27,7 +27,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V10"
+APP_VERSION   = "V11"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -48,7 +48,7 @@ def _load_settings() -> dict:
     except Exception:
         pass
     return {"start_on_boot": False, "minimize_to_tray": True,
-            "launch_minimized": False, "auto_connect": False}
+            "launch_minimized": False, "auto_connect": False, "auto_update": True}
 
 
 def _save_settings(data: dict):
@@ -215,9 +215,12 @@ class App(ctk.CTk):
         self._ping_server()
         self.after(1500, self._check_update)
 
+        # Auto-update check (runs after server ping settles)
+        self.after(3000, self._auto_check_update)
+
         # Auto-connect
         if self._settings.get("auto_connect", False):
-            self.after(3000, self._start)
+            self.after(5000, self._start)
 
     # ── Tray ──────────────────────────────────────────────────────────────────
 
@@ -439,6 +442,12 @@ class App(ctk.CTk):
         # ── UPDATES ──
         self._sw_section(scroll, "UPDATES")
 
+        auto_upd_var = ctk.BooleanVar(value=self._settings.get("auto_update", True))
+        self._sw_row(scroll, "Auto-update check",
+                     "Check for new versions automatically each time FortiProxy opens",
+                     auto_upd_var,
+                     lambda v: self._save_setting("auto_update", v))
+
         ver_card = ctk.CTkFrame(scroll, fg_color="#0d0d1e", corner_radius=10)
         ver_card.pack(fill="x", padx=16, pady=(4, 12))
 
@@ -635,6 +644,8 @@ class App(ctk.CTk):
                     cwd=str(tmp),
                     creationflags=0x00000010,  # CREATE_NEW_CONSOLE — shows install window
                 )
+                # Delete temp folder when Python exits (by then install.bat has finished copying)
+                atexit.register(shutil.rmtree, str(tmp), True)
                 self._tlog("Installer launched — FortiProxy will restart", "ok")
                 self.after(2000, self._full_quit)
 
@@ -645,6 +656,78 @@ class App(ctk.CTk):
                         state="normal", text="↓ Install Update"))
 
         threading.Thread(target=_run, daemon=True).start()
+
+    def _auto_check_update(self):
+        if not self._settings.get("auto_update", True):
+            return
+
+        def _run():
+            try:
+                url = f"https://api.github.com/repos/{REPO}/releases/latest"
+                req = urllib.request.Request(
+                    url, headers={"User-Agent": "FortiProxy/2.0",
+                                  "Accept": "application/vnd.github+json"})
+                with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as r:
+                    data = json.loads(r.read())
+                latest = data.get("tag_name", "").strip()
+                if not latest:
+                    return
+
+                def vnum(s):
+                    try: return int(s.lstrip("Vv"))
+                    except ValueError: return 0
+
+                if vnum(latest) > vnum(APP_VERSION):
+                    asset = next(
+                        (a for a in data.get("assets", [])
+                         if a.get("name", "").endswith(".zip")),
+                        None,
+                    )
+                    self._update_download_url = (
+                        asset["browser_download_url"] if asset else None
+                    )
+                    self.after(0, lambda: self._show_update_prompt(latest))
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _show_update_prompt(self, version: str):
+        if self._closing:
+            return
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Update Available")
+        dialog.geometry("360x170")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color="#08080f")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.lift()
+        dialog.focus_force()
+
+        ctk.CTkLabel(dialog, text="Update Available",
+                     font=ctk.CTkFont("Consolas", 15, "bold"),
+                     text_color="#00d4ff").pack(pady=(22, 6))
+        ctk.CTkLabel(dialog,
+                     text=f"Version {version} is available.\nWould you like to update now?",
+                     font=ctk.CTkFont("Consolas", 11),
+                     text_color="#aaaacc").pack(pady=(0, 18))
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack()
+
+        def _do_update():
+            dialog.destroy()
+            self._install_update()
+
+        ctk.CTkButton(btn_row, text="Update Now", width=130, height=36,
+                      font=ctk.CTkFont("Consolas", 12, "bold"),
+                      fg_color="#005c2e", hover_color="#008040",
+                      command=_do_update).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_row, text="Later", width=80, height=36,
+                      font=ctk.CTkFont("Consolas", 12),
+                      fg_color="#151528", hover_color="#1f1f3a",
+                      command=dialog.destroy).pack(side="left")
 
     # ── Logging ───────────────────────────────────────────────────────────────
 
