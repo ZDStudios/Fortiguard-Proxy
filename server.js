@@ -381,12 +381,6 @@ wss.on("connection", (ws, req) => {
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
-if (require.main === module) {
-  // Running directly (Render, local)
-  server.listen(PORT, () => {
-    console.log(`FortiProxy server listening on port ${PORT}`);
-  });
-} else {
-  // Exported for Vercel
-  module.exports = server;
-}
+server.listen(PORT, () => {
+  console.log(`FortiProxy server listening on port ${PORT}`);
+});
