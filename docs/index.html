@@ -5,315 +5,533 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FortiProxy Dashboard</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#08080f;--card:#0d0d1e;--hdr:#04040c;--border:#111128;--border2:#1e1e3a;
-  --accent:#00d4ff;--green:#00ff88;--red:#ff3355;--warn:#ffaa00;
-  --text:#aaaacc;--dim:#444466;--dim2:#333355;--dim3:#222244;--dim4:#151528;
-  --bg-input:#06060e;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f3f4f6;
+  color: #111827;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
-body{background:var(--bg);color:var(--text);font-family:Consolas,'Courier New',monospace;min-height:100vh;display:flex;flex-direction:column}
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
-.hdr{background:var(--hdr);padding:14px 24px;border-bottom:1px solid var(--border);
-     display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.hdr-logo{color:var(--accent);font-size:1.1em;letter-spacing:3px;user-select:none}
-.hdr-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);vertical-align:middle;margin-right:5px;transition:background .3s}
-.dot.green{background:var(--green)}
-.dot.red{background:var(--red)}
-.dot.warn{background:var(--warn)}
-.srv-badge{font-size:.72em;letter-spacing:2px;color:var(--dim);padding:3px 10px;border:1px solid var(--border2);border-radius:4px;cursor:default}
-.srv-badge.active{color:var(--accent);border-color:var(--accent)}
+/* ── Top nav ───────────────────────────────────────────────────────────────── */
+nav {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.nav-brand {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: #f8fafc;
+}
+.nav-brand span { color: #38bdf8; }
+.nav-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-/* ── Tabs ─────────────────────────────────────────────────────────────────── */
-.tabs{display:flex;background:var(--hdr);border-bottom:1px solid var(--border);padding:0 24px}
-.tab{padding:12px 20px;font-size:.75em;letter-spacing:2px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--accent);border-color:var(--accent)}
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #334155;
+  color: #94a3b8;
+}
+.badge-pill.connected { background: #14532d; color: #86efac; }
+.badge-pill.error     { background: #450a0a; color: #fca5a5; }
 
-/* ── Pages ────────────────────────────────────────────────────────────────── */
-.page{display:none;flex:1;flex-direction:column}
-.page.show{display:flex}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #4b5563;
+  flex-shrink: 0;
+}
+.status-dot.green { background: #22c55e; }
+.status-dot.red   { background: #ef4444; }
+.status-dot.amber { background: #f59e0b; }
 
-/* ── Login page ───────────────────────────────────────────────────────────── */
-.login-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 16px}
-.login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;
-            padding:44px 40px;width:100%;max-width:380px;text-align:center}
-.login-title{color:var(--accent);font-size:1.3em;letter-spacing:3px;margin-bottom:4px}
-.login-sub{color:var(--dim3);font-size:.72em;letter-spacing:2px;margin-bottom:32px}
-.srv-info{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;
-          margin-bottom:24px;text-align:left}
-.srv-info-row{display:flex;align-items:center;gap:8px;font-size:.72em;margin-bottom:4px}
-.srv-info-row:last-child{margin-bottom:0}
-.srv-lbl{color:var(--dim2);width:60px;flex-shrink:0}
-.srv-url{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.field-label{color:var(--dim2);font-size:.7em;letter-spacing:2px;margin-bottom:6px;text-align:left}
-input[type=password]{width:100%;background:var(--bg-input);border:1px solid var(--border2);
-  border-radius:8px;padding:13px 14px;color:var(--text);font-family:inherit;font-size:.9em;
-  outline:none;transition:border-color .2s;letter-spacing:3px}
-input[type=password]:focus{border-color:var(--accent)}
-input[type=text]{width:100%;background:var(--bg-input);border:1px solid var(--border2);
-  border-radius:8px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:.85em;
-  outline:none;transition:border-color .2s}
-input[type=text]:focus{border-color:var(--accent)}
-.btn-connect{width:100%;background:#005c2e;border:none;border-radius:8px;padding:13px;
-             color:var(--green);font-family:inherit;font-size:.95em;font-weight:bold;
-             letter-spacing:2px;cursor:pointer;margin-top:20px;transition:background .2s}
-.btn-connect:hover{background:#008040}
-.login-err{color:var(--red);font-size:.8em;margin-top:12px;min-height:18px}
+.nav-time { color: #64748b; font-size: 12px; }
 
-/* ── Stat cards ───────────────────────────────────────────────────────────── */
-.stats{display:flex;gap:1px;background:var(--border)}
-.stat{flex:1;background:#0a0a18;padding:16px 20px}
-.stat-val{font-size:1.8em;font-weight:bold;color:var(--accent)}
-.stat-lbl{color:var(--dim3);font-size:.68em;letter-spacing:2px;margin-top:3px}
+/* ── Sub-nav tabs ──────────────────────────────────────────────────────────── */
+.subnav {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 24px;
+  display: none;
+}
+.subnav.show { display: flex; }
+.subnav-tab {
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.subnav-tab:hover  { color: #111827; }
+.subnav-tab.active { color: #2563eb; border-color: #2563eb; }
 
-/* ── Content area ─────────────────────────────────────────────────────────── */
-.content{padding:20px 24px;flex:1;overflow:auto}
-.section-title{color:var(--dim3);font-size:.68em;letter-spacing:3px;margin-bottom:14px}
+/* ── Pages ─────────────────────────────────────────────────────────────────── */
+.page { display: none; flex: 1; flex-direction: column; }
+.page.show { display: flex; }
 
-/* ── Search ───────────────────────────────────────────────────────────────── */
-.search-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.search-input{background:var(--bg-input);border:1px solid var(--border2);border-radius:6px;
-  padding:8px 12px;color:var(--text);font-family:inherit;font-size:.82em;outline:none;
-  width:200px;transition:border-color .2s}
-.search-input:focus{border-color:var(--accent)}
-.cnt{color:var(--dim);font-size:.72em;margin-left:auto}
-.refresh-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;
-  padding:6px 12px;color:var(--dim);font-family:inherit;font-size:.72em;cursor:pointer;transition:.2s}
-.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* ── Login ─────────────────────────────────────────────────────────────────── */
+.login-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+.login-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+}
+.login-logo {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+.login-logo span { color: #2563eb; }
+.login-sub {
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 28px;
+}
+.server-preview {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+}
+.server-preview-row {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+.server-preview-row:last-child { margin-bottom: 0; }
+.server-preview-row b { color: #374151; width: 58px; flex-shrink: 0; }
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+input[type=password], input[type=text], textarea, select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary  { background: #2563eb; color: #fff; }
+.btn-primary:hover:not(:disabled)  { background: #1d4ed8; }
+.btn-success  { background: #16a34a; color: #fff; }
+.btn-success:hover:not(:disabled)  { background: #15803d; }
+.btn-danger   { background: #dc2626; color: #fff; }
+.btn-danger:hover:not(:disabled)   { background: #b91c1c; }
+.btn-ghost    { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
+.btn-ghost:hover:not(:disabled) { background: #f9fafb; color: #374151; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.login-card .btn-primary { width: 100%; margin-top: 16px; padding: 11px; }
+.login-err { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 18px; }
 
-/* ── Table ────────────────────────────────────────────────────────────────── */
-.tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:580px}
-thead th{text-align:left;padding:10px 12px;color:var(--dim3);font-size:.68em;letter-spacing:2px;
-         border-bottom:1px solid var(--border)}
-tbody tr{transition:background .15s}
-tbody tr:hover{background:var(--card)}
-tbody td{padding:10px 12px;border-bottom:1px solid var(--dim4);font-size:.84em;vertical-align:middle}
-.bdot{font-size:.6em;vertical-align:middle;margin-right:4px}
-.bdot.g{color:var(--green)}
-.bdot.r{color:var(--red)}
-.bdot.d{color:var(--dim)}
-.badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:.7em;font-weight:bold;letter-spacing:1px}
-.badge-live{background:#001a0d;color:var(--green);border:1px solid #003318}
-.badge-idle{background:var(--border);color:var(--dim);border:1px solid var(--border2)}
-.badge-blocked{background:#2a0006;color:var(--red);border:1px solid #550011}
-.cell-dev{color:var(--warn)}
-.cell-ip{color:var(--accent)}
-.cell-dim{color:var(--dim)}
-.block-btn{background:#1a0006;border:1px solid #550011;border-radius:5px;padding:4px 10px;
-  color:var(--red);font-family:inherit;font-size:.72em;cursor:pointer;transition:background .2s}
-.block-btn:hover{background:#330011}
-.unblock-btn{background:#001a0d;border:1px solid #003318;border-radius:5px;padding:4px 10px;
-  color:var(--green);font-family:inherit;font-size:.72em;cursor:pointer;transition:background .2s}
-.unblock-btn:hover{background:#003316}
-.empty-msg{text-align:center;padding:60px;color:var(--dim3)}
+/* ── Stat cards ─────────────────────────────────────────────────────────────── */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 20px 24px;
+  background: #f3f4f6;
+}
+@media (max-width: 640px) { .stat-strip { grid-template-columns: repeat(2,1fr); } }
+.stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.stat-val { font-size: 28px; font-weight: 800; color: #111827; line-height: 1; margin-bottom: 4px; }
+.stat-lbl { font-size: 12px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
 
-/* ── Fetch page ───────────────────────────────────────────────────────────── */
-.fetch-grid{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px}
-.fetch-url{background:var(--bg-input);border:1px solid var(--border2);border-radius:8px;
-  padding:12px 14px;color:var(--text);font-family:inherit;font-size:.9em;outline:none;width:100%}
-.fetch-url:focus{border-color:var(--accent)}
-select{background:var(--bg-input);border:1px solid var(--border2);border-radius:8px;
-  padding:11px 12px;color:var(--text);font-family:inherit;font-size:.85em;outline:none;cursor:pointer}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-@media(max-width:640px){.two-col{grid-template-columns:1fr}}
-textarea{width:100%;background:var(--bg-input);border:1px solid var(--border2);border-radius:8px;
-  padding:12px 14px;color:var(--text);font-family:inherit;font-size:.82em;outline:none;
-  resize:vertical;min-height:100px;transition:border-color .2s}
-textarea:focus{border-color:var(--accent)}
-.btn-send{background:#0a2a44;border:1px solid #004477;border-radius:8px;padding:11px 24px;
-  color:var(--accent);font-family:inherit;font-size:.9em;cursor:pointer;letter-spacing:2px;transition:.2s}
-.btn-send:hover{background:#003055}
-.btn-send:disabled{opacity:.4;cursor:not-allowed}
-.resp-wrap{margin-top:20px}
-.resp-bar{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
-.resp-status{font-size:1.1em;font-weight:bold}
-.resp-status.ok{color:var(--green)}
-.resp-status.err{color:var(--red)}
-.resp-status.warn{color:var(--warn)}
-.resp-time{color:var(--dim);font-size:.78em}
-.resp-hdrs{color:var(--dim);font-size:.75em;margin-bottom:8px;max-height:80px;overflow-y:auto;
-  background:var(--bg-input);border-radius:6px;padding:8px 12px}
-pre.resp-body{background:var(--card);border:1px solid var(--border);border-radius:8px;
-  padding:16px;overflow:auto;max-height:400px;font-size:.8em;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-.copy-btn{background:transparent;border:1px solid var(--border2);border-radius:5px;padding:4px 10px;
-  color:var(--dim);font-family:inherit;font-size:.7em;cursor:pointer;transition:.2s}
-.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* ── Content ────────────────────────────────────────────────────────────────── */
+.content { padding: 0 24px 24px; flex: 1; }
 
-/* ── Settings page ────────────────────────────────────────────────────────── */
-.settings-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:540px;margin-bottom:16px}
-.settings-title{color:var(--dim2);font-size:.7em;letter-spacing:2px;margin-bottom:16px}
-.settings-row{margin-bottom:14px}
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  overflow: hidden;
+}
+.card-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.card-title { font-size: 14px; font-weight: 700; color: #111827; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ── Toast ───────────────────────────────────────────────────────────────────── */
-#toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);
-  border-radius:8px;padding:12px 18px;font-size:.82em;color:var(--text);opacity:0;
-  transition:opacity .3s;z-index:999;pointer-events:none}
-#toast.show{opacity:1}
+/* ── Search ─────────────────────────────────────────────────────────────────── */
+.search-input-sm {
+  width: 200px;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s;
+}
+.search-input-sm:focus { border-color: #2563eb; }
+.count-label { font-size: 12px; color: #9ca3af; }
 
-/* ── Animations ───────────────────────────────────────────────────────────── */
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.blink{animation:blink 1.6s infinite}
+/* ── Table ──────────────────────────────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
+thead th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  text-align: left;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+tbody td {
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #f9fafb; }
+.td-device { font-weight: 600; color: #111827; }
+.td-ip     { color: #2563eb; font-family: ui-monospace, monospace; font-size: 12px; }
+.td-dim    { color: #9ca3af; }
+
+/* ── Status badges ──────────────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.sb-online  { background: #dcfce7; color: #15803d; }
+.sb-offline { background: #f3f4f6; color: #6b7280; }
+.sb-blocked { background: #fee2e2; color: #b91c1c; }
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── Action buttons in table ────────────────────────────────────────────────── */
+.action-block   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; }
+.action-block:hover { background: #fee2e2; }
+.action-unblock { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; }
+.action-unblock:hover { background: #dcfce7; }
+
+.empty-row td { text-align: center; padding: 48px; color: #9ca3af; font-size: 13px; }
+
+/* ── Fetch page ─────────────────────────────────────────────────────────────── */
+.form-row     { margin-bottom: 14px; }
+.form-row label { margin-bottom: 5px; }
+.input-group  { display: flex; gap: 8px; }
+.input-group input { flex: 1; }
+.two-col      { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+textarea { min-height: 100px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+
+.resp-section { margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 18px; }
+.resp-meta    { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.resp-code    { font-size: 20px; font-weight: 800; }
+.resp-code.ok   { color: #16a34a; }
+.resp-code.warn { color: #d97706; }
+.resp-code.err  { color: #dc2626; }
+.resp-text    { color: #6b7280; font-size: 13px; }
+.resp-ms      { color: #9ca3af; font-size: 12px; }
+.resp-hdrs-box {
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;
+  padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 11px;
+  color: #4b5563; max-height: 80px; overflow-y: auto; margin-bottom: 10px;
+}
+pre.resp-body {
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 14px 16px; font-family: ui-monospace, monospace; font-size: 12px;
+  line-height: 1.6; max-height: 400px; overflow: auto;
+  white-space: pre-wrap; word-break: break-all; color: #1e293b;
+}
+
+/* ── Settings ───────────────────────────────────────────────────────────────── */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } }
+.info-table { width: 100%; border-collapse: collapse; }
+.info-table td { padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+.info-table td:first-child { color: #6b7280; font-weight: 500; width: 110px; }
+.info-table td:last-child  { color: #111827; font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+.info-table tr:last-child td { border-bottom: none; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: #1e293b; color: #f1f5f9;
+  border-radius: 8px; padding: 10px 16px;
+  font-size: 13px; font-weight: 500;
+  opacity: 0; transition: opacity .25s;
+  pointer-events: none; z-index: 999;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+#toast.show { opacity: 1; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.pulse { animation: pulse 2s infinite; }
 </style>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────────────── -->
-<div class="hdr">
-  <div class="hdr-logo">&#128737;&nbsp;FORTIPROXY</div>
-  <div class="hdr-right">
-    <span class="srv-badge" id="render-badge"><span class="dot" id="render-dot"></span>RENDER</span>
-    <span class="srv-badge" id="vercel-badge"><span class="dot" id="vercel-dot"></span>VERCEL</span>
-    <span style="color:var(--dim);font-size:.72em" id="last-update">—</span>
+<!-- ── Nav ─────────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-brand">Forti<span>Proxy</span></div>
+  <div class="nav-right">
+    <span class="badge-pill" id="render-badge">
+      <span class="status-dot" id="render-dot"></span>
+      Render
+    </span>
+    <span class="badge-pill" id="vercel-badge">
+      <span class="status-dot" id="vercel-dot"></span>
+      Vercel
+    </span>
+    <span class="nav-time" id="last-update"></span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#94a3b8;border-color:#334155" onclick="doLogout()">Logout</button>
   </div>
-</div>
+</nav>
 
-<!-- ── Tabs (hidden until logged in) ───────────────────────────────────────── -->
-<div class="tabs" id="main-tabs" style="display:none">
-  <div class="tab active" data-page="devices">DEVICES</div>
-  <div class="tab" data-page="fetch">PROXY FETCH</div>
-  <div class="tab" data-page="settings">SETTINGS</div>
+<!-- ── Sub-nav ──────────────────────────────────────────────────────────────── -->
+<div class="subnav" id="subnav">
+  <div class="subnav-tab active" data-page="devices">Devices</div>
+  <div class="subnav-tab" data-page="fetch">Proxy Fetch</div>
+  <div class="subnav-tab" data-page="settings">Settings</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
-<!-- LOGIN PAGE -->
+<!-- LOGIN -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <div class="page show" id="page-login">
   <div class="login-wrap">
     <div class="login-card">
-      <div class="login-title">&#128737;&nbsp;FORTIPROXY</div>
-      <div class="login-sub">ADMIN DASHBOARD</div>
+      <div class="login-logo">Forti<span>Proxy</span></div>
+      <div class="login-sub">Admin Dashboard · Sign in to continue</div>
 
-      <div class="srv-info">
-        <div class="srv-info-row">
-          <span class="srv-lbl">PRIMARY</span>
-          <span class="srv-url" style="color:var(--accent)" id="disp-srv1"></span>
-        </div>
-        <div class="srv-info-row">
-          <span class="srv-lbl">BACKUP</span>
-          <span class="srv-url" id="disp-srv2"></span>
-        </div>
+      <div class="server-preview">
+        <div class="server-preview-row"><b>Primary</b><span id="disp-srv1" style="color:#2563eb"></span></div>
+        <div class="server-preview-row"><b>Backup</b><span id="disp-srv2" style="color:#6b7280"></span></div>
       </div>
 
-      <div class="field-label">ACCESS TOKEN</div>
+      <label for="inp-token">Access Token</label>
       <input type="password" id="inp-token" placeholder="Enter your PROXY_TOKEN"
              onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="btn-connect" onclick="doLogin()">ACCESS DASHBOARD</button>
+      <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
       <div class="login-err" id="login-err"></div>
     </div>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
-<!-- DEVICES PAGE -->
+<!-- DEVICES -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-devices">
-  <div class="stats">
-    <div class="stat"><div class="stat-val" id="s-online">0</div><div class="stat-lbl">ONLINE NOW</div></div>
-    <div class="stat"><div class="stat-val" id="s-total">0</div><div class="stat-lbl">TOTAL DEVICES</div></div>
-    <div class="stat"><div class="stat-val" id="s-blocked">0</div><div class="stat-lbl">BLOCKED</div></div>
-    <div class="stat"><div class="stat-val" id="s-tunnels">0</div><div class="stat-lbl">TUNNELS</div></div>
-  </div>
-  <div class="content">
-    <div class="search-bar">
-      <div class="section-title" style="margin:0">CONNECTED DEVICES</div>
-      <input class="search-input" id="search" placeholder="Search..." oninput="renderTable()">
-      <span class="cnt" id="dev-count"></span>
-      <button class="refresh-btn" onclick="requestRefresh()">&#8635; REFRESH</button>
+  <div class="stat-strip">
+    <div class="stat-card">
+      <div class="stat-val" id="s-online">0</div>
+      <div class="stat-lbl">Online now</div>
     </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th>STATUS</th><th>DEVICE</th><th>IP ADDRESS</th>
-          <th>REQUESTS</th><th>LAST SEEN</th><th>ACTION</th>
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <div class="stat-card">
+      <div class="stat-val" id="s-total">0</div>
+      <div class="stat-lbl">Total devices</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-blocked">0</div>
+      <div class="stat-lbl">Blocked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-tunnels">0</div>
+      <div class="stat-lbl">Active tunnels</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">Connected Devices</span>
+        <div class="card-actions">
+          <input class="search-input-sm" id="search" placeholder="Search devices…" oninput="renderTable()">
+          <span class="count-label" id="dev-count"></span>
+          <button class="btn btn-ghost btn-sm" onclick="renderTable()">↺ Refresh</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Device</th><th>IP Address</th>
+            <th>Requests</th><th>Last Seen</th><th>Action</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
-<!-- PROXY FETCH PAGE -->
+<!-- PROXY FETCH -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-fetch">
-  <div class="content">
-    <div class="section-title">PROXY FETCH — MITM REQUEST</div>
-    <p style="color:var(--dim);font-size:.78em;margin-bottom:18px">
-      The server fetches this URL on your behalf and returns the response. Use it to access blocked sites or APIs.
-    </p>
-    <div class="fetch-grid">
-      <input class="fetch-url" id="fetch-url" type="text" placeholder="https://example.com/api/endpoint">
-      <select id="fetch-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option></select>
-    </div>
-    <div class="two-col">
-      <div>
-        <div class="field-label" style="margin-bottom:6px">REQUEST HEADERS (JSON)</div>
-        <textarea id="fetch-headers" placeholder='{"Content-Type": "application/json"}'></textarea>
+  <div class="content" style="padding-top:20px">
+    <div class="card" style="max-width:860px">
+      <div class="card-hdr">
+        <span class="card-title">Proxy Fetch</span>
+        <span style="font-size:12px;color:#6b7280">Send a request through the FortiProxy server and get the response back</span>
       </div>
-      <div>
-        <div class="field-label" style="margin-bottom:6px">REQUEST BODY</div>
-        <textarea id="fetch-body" placeholder='{"key": "value"}'></textarea>
+      <div style="padding:18px">
+        <div class="form-row">
+          <label>URL &amp; Method</label>
+          <div class="input-group">
+            <input type="text" id="fetch-url" placeholder="https://example.com/api/endpoint" style="flex:1">
+            <select id="fetch-method" style="width:100px">
+              <option>GET</option><option>POST</option><option>PUT</option>
+              <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+            </select>
+            <select id="fetch-server-sel" style="width:160px">
+              <option value="auto">Auto (Render first)</option>
+              <option value="0">Render (primary)</option>
+              <option value="1">Vercel (backup)</option>
+            </select>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="form-row" style="margin-bottom:0">
+            <label>Request Headers <span style="font-weight:400;color:#9ca3af">(JSON)</span></label>
+            <textarea id="fetch-headers" placeholder='{"Content-Type": "application/json"}'></textarea>
+          </div>
+          <div class="form-row" style="margin-bottom:0">
+            <label>Request Body</label>
+            <textarea id="fetch-body" placeholder='{"key": "value"}'></textarea>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" id="fetch-btn" onclick="doFetch()">Send Request</button>
+        </div>
+
+        <div class="resp-section" id="resp-wrap" style="display:none">
+          <div class="resp-meta">
+            <span class="resp-code" id="resp-status-code"></span>
+            <span class="resp-text" id="resp-status-text"></span>
+            <span class="resp-ms" id="resp-time"></span>
+            <button class="btn btn-ghost btn-sm" onclick="copyResp()">Copy body</button>
+          </div>
+          <div class="resp-hdrs-box" id="resp-hdrs"></div>
+          <pre class="resp-body" id="resp-body"></pre>
+        </div>
       </div>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn-send" id="fetch-btn" onclick="doFetch()">&#9654; SEND REQUEST</button>
-      <select id="fetch-server-sel" style="font-size:.78em">
-        <option value="auto">Auto (Render first)</option>
-        <option value="0">Primary — Render</option>
-        <option value="1">Secondary — Vercel</option>
-      </select>
-    </div>
-    <div class="resp-wrap" id="resp-wrap" style="display:none">
-      <div class="resp-bar">
-        <span class="resp-status" id="resp-status-code"></span>
-        <span id="resp-status-text" style="color:var(--dim);font-size:.82em"></span>
-        <span class="resp-time" id="resp-time"></span>
-        <button class="copy-btn" onclick="copyResp()">COPY BODY</button>
-      </div>
-      <div class="resp-hdrs" id="resp-hdrs"></div>
-      <pre class="resp-body" id="resp-body"></pre>
     </div>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
-<!-- SETTINGS PAGE -->
+<!-- SETTINGS -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-settings">
-  <div class="content">
-    <div class="section-title">SETTINGS</div>
+  <div class="content" style="padding-top:20px">
+    <div class="settings-grid">
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Server Configuration</span></div>
+        <div style="padding:18px">
+          <div class="form-row">
+            <label>Primary Server (Render)</label>
+            <input type="text" id="set-srv1">
+          </div>
+          <div class="form-row">
+            <label>Secondary Server (Vercel)</label>
+            <input type="text" id="set-srv2">
+          </div>
+          <div class="form-row">
+            <label>Access Token</label>
+            <input type="password" id="set-token">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn btn-primary" onclick="saveSettings()">Save &amp; Reconnect</button>
+            <button class="btn btn-ghost" onclick="doLogout()">Logout</button>
+          </div>
+        </div>
+      </div>
 
-    <div class="settings-card">
-      <div class="settings-title">SERVER URLS (auto-configured)</div>
-      <div class="settings-row">
-        <div class="field-label">PRIMARY (Render)</div>
-        <input type="text" id="set-srv1">
-      </div>
-      <div class="settings-row">
-        <div class="field-label">SECONDARY (Vercel)</div>
-        <input type="text" id="set-srv2">
-      </div>
-      <div class="settings-row">
-        <div class="field-label">ACCESS TOKEN</div>
-        <input type="password" id="set-token">
-      </div>
-      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-        <button class="btn-send" onclick="saveSettings()" style="padding:9px 18px">SAVE &amp; RECONNECT</button>
-        <button class="refresh-btn" onclick="doLogout()" style="color:var(--red);border-color:#550011">LOGOUT</button>
-      </div>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-title">CONNECTION STATUS</div>
-      <div style="font-size:.82em;line-height:2.2">
-        <div><span style="color:var(--dim2)">PRIMARY  :</span> <span id="inf-srv1" style="color:var(--accent)">—</span></div>
-        <div><span style="color:var(--dim2)">SECONDARY:</span> <span id="inf-srv2" style="color:var(--dim)">—</span></div>
-        <div><span style="color:var(--dim2)">ACTIVE   :</span> <span id="inf-active" style="color:var(--green)">—</span></div>
-        <div><span style="color:var(--dim2)">WS STATE :</span> <span id="inf-wsstate" style="color:var(--dim)">—</span></div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Connection Status</span></div>
+        <div style="padding:18px">
+          <table class="info-table">
+            <tr><td>Primary</td><td id="inf-srv1">—</td></tr>
+            <tr><td>Secondary</td><td id="inf-srv2">—</td></tr>
+            <tr><td>Active</td><td id="inf-active">—</td></tr>
+            <tr><td>WS State</td><td id="inf-wsstate">—</td></tr>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -328,52 +546,49 @@ const DEFAULT_SERVERS = [
   "wss://fortiguard-proxy.vercel.app",
 ];
 
-// ── Persistent config (token only needed from user) ───────────────────────────
 const LS = {
   get(k)   { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
   set(k,v) { try { localStorage.setItem(k, v); } catch {} },
 };
 
-// Allow overriding server URLs from localStorage (for settings page), fall back to defaults
 let cfg = {
   srv1:  LS.get("fp_srv1")  || DEFAULT_SERVERS[0],
   srv2:  LS.get("fp_srv2")  || DEFAULT_SERVERS[1],
   token: LS.get("fp_token") || "",
 };
 
-// Show server URLs on login page
-document.getElementById("disp-srv1").textContent = cfg.srv1.replace("wss://","");
-document.getElementById("disp-srv2").textContent = cfg.srv2.replace("wss://","") || "not configured";
-
-let ws            = null;
-let wsConnected   = false;
-let activeSrvIdx  = 0;
-let reconnTimeout = null;
-let devices       = [];
-const THRESH      = 30000;
+let ws           = null;
+let wsConnected  = false;
+let activeSrvIdx = 0;
+let reconnTO     = null;
+let devices      = [];
+const THRESH     = 30000;
 
 function servers() { return [cfg.srv1, cfg.srv2].filter(Boolean); }
 
+// ── Login page server preview ──────────────────────────────────────────────────
+document.getElementById("disp-srv1").textContent = cfg.srv1.replace(/^wss?:\/\//, "");
+document.getElementById("disp-srv2").textContent = cfg.srv2.replace(/^wss?:\/\//, "") || "not configured";
+
 // ── Toast ──────────────────────────────────────────────────────────────────────
-let toastTimer;
-function toast(msg, color) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.style.color = color || "var(--text)";
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2800);
+let toastTO;
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTO);
+  toastTO = setTimeout(() => el.classList.remove("show"), 2500);
 }
 
-// ── Tabs ───────────────────────────────────────────────────────────────────────
-document.querySelectorAll(".tab").forEach(tab => {
+// ── Tab switching ──────────────────────────────────────────────────────────────
+document.querySelectorAll(".subnav-tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".subnav-tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
-    const target = tab.dataset.page;
+    const pg = tab.dataset.page;
     document.querySelectorAll(".page").forEach(p => p.classList.remove("show"));
-    document.getElementById("page-" + target).classList.add("show");
-    if (target === "settings") populateSettings();
+    document.getElementById("page-" + pg).classList.add("show");
+    if (pg === "settings") populateSettings();
   });
 });
 
@@ -382,10 +597,10 @@ function showPage(id) {
   document.getElementById("page-" + id).classList.add("show");
 }
 
-// ── Login ──────────────────────────────────────────────────────────────────────
+// ── Login / logout ─────────────────────────────────────────────────────────────
 function doLogin() {
   const token = document.getElementById("inp-token").value.trim();
-  if (!token) { document.getElementById("login-err").textContent = "Enter your access token."; return; }
+  if (!token) { document.getElementById("login-err").textContent = "Please enter your access token."; return; }
   cfg.token = token;
   LS.set("fp_token", token);
   document.getElementById("login-err").textContent = "";
@@ -393,58 +608,63 @@ function doLogin() {
 }
 
 function doLogout() {
-  clearTimeout(reconnTimeout);
+  clearTimeout(reconnTO);
   if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch {} ws = null; }
   wsConnected = false;
   devices = [];
-  setDot("render-dot", "d");
-  setDot("vercel-dot", "d");
-  document.querySelectorAll(".srv-badge").forEach(b => b.classList.remove("active"));
-  document.getElementById("main-tabs").style.display = "none";
+  setServerBadge("render", false, false);
+  setServerBadge("vercel", false, false);
+  document.getElementById("subnav").classList.remove("show");
+  document.getElementById("logout-btn").style.display = "none";
+  document.getElementById("last-update").textContent = "";
   document.getElementById("inp-token").value = "";
   showPage("login");
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────────────────
-function openWS(srvIdx) {
-  const srvList = servers();
-  if (!srvList.length) return;
+function openWS(idx) {
+  const list = servers();
+  if (!list.length) return;
 
-  const idx = srvIdx % srvList.length;
+  idx = idx % list.length;
   activeSrvIdx = idx;
-  const url = srvList[idx] + "/ws-admin?token=" + encodeURIComponent(cfg.token);
 
-  setDot(idx === 0 ? "render-dot" : "vercel-dot", "warn");
+  setServerBadge(idx === 0 ? "render" : "vercel", "connecting", false);
 
   if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch {} }
 
-  ws = new WebSocket(url);
+  ws = new WebSocket(list[idx] + "/ws-admin?token=" + encodeURIComponent(cfg.token));
 
   ws.onopen = () => {
     wsConnected = true;
     document.getElementById("login-err").textContent = "";
-    document.getElementById("main-tabs").style.display = "flex";
-    // Switch to devices tab if coming from login
-    if (!document.getElementById("page-devices").classList.contains("show") &&
-        document.getElementById("page-login").classList.contains("show")) {
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      document.querySelector(".tab[data-page='devices']").classList.add("active");
+    document.getElementById("subnav").classList.add("show");
+    document.getElementById("logout-btn").style.display = "";
+
+    // Switch from login to devices
+    if (document.getElementById("page-login").classList.contains("show")) {
+      document.querySelectorAll(".subnav-tab").forEach(t => t.classList.remove("active"));
+      document.querySelector(".subnav-tab[data-page='devices']").classList.add("active");
+      showPage("devices");
     }
-    showPage("devices");
-    activateServerBadge(idx);
-    document.getElementById("last-update").textContent = new Date().toLocaleTimeString();
-    toast("Connected to " + srvList[idx].replace("wss://",""), "var(--green)");
+
+    setServerBadge(idx === 0 ? "render" : "vercel", true, true);
+    setServerBadge(idx === 0 ? "vercel" : "render", false, false);
+    document.getElementById("last-update").textContent =
+      "Updated " + new Date().toLocaleTimeString();
     updateInfoPanel();
+    toast("Connected to " + list[idx].replace(/^wss?:\/\//, ""));
   };
 
-  ws.onmessage = (ev) => {
+  ws.onmessage = ev => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "state") {
         devices = msg.devices || [];
         renderTable();
         updateStats();
-        document.getElementById("last-update").textContent = new Date().toLocaleTimeString();
+        document.getElementById("last-update").textContent =
+          "Updated " + new Date().toLocaleTimeString();
       }
     } catch {}
   };
@@ -453,43 +673,29 @@ function openWS(srvIdx) {
 
   ws.onclose = () => {
     wsConnected = false;
-    setDot("render-dot", "d");
-    setDot("vercel-dot", "d");
-    document.querySelectorAll(".srv-badge").forEach(b => b.classList.remove("active"));
+    setServerBadge("render", false, false);
+    setServerBadge("vercel", false, false);
     updateInfoPanel();
-
-    // Rotate to next server
-    const nextIdx = (idx + 1) % srvList.length;
-    const delay   = nextIdx !== 0 ? 1500 : 6000;
-    reconnTimeout = setTimeout(() => openWS(nextIdx), delay);
+    const next = (idx + 1) % list.length;
+    reconnTO = setTimeout(() => openWS(next), next !== 0 ? 1500 : 6000);
   };
 }
 
-function activateServerBadge(idx) {
-  document.querySelectorAll(".srv-badge").forEach(b => b.classList.remove("active"));
-  setDot("render-dot", "d");
-  setDot("vercel-dot", "d");
-  if (idx === 0) { document.getElementById("render-badge").classList.add("active"); setDot("render-dot","green"); }
-  else           { document.getElementById("vercel-badge").classList.add("active"); setDot("vercel-dot","green"); }
-}
-
-function setDot(id, state) {
-  const el = document.getElementById(id);
-  el.className = "dot" + (state && state !== "d" ? " " + state : "");
-  if (state === "green") el.classList.add("blink"); else el.classList.remove("blink");
-}
-
-function requestRefresh() {
-  toast("Refreshed", "var(--accent)");
+function setServerBadge(name, connected, pulse) {
+  const badge = document.getElementById(name + "-badge");
+  const dot   = document.getElementById(name + "-dot");
+  badge.className = "badge-pill" + (connected === true ? " connected" : connected === "connecting" ? "" : " error");
+  dot.className   = "status-dot" + (connected === true ? " green" : connected === "connecting" ? " amber" : "");
+  if (pulse && connected === true) dot.classList.add("pulse");
 }
 
 // ── Device table ───────────────────────────────────────────────────────────────
 function esc(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 function ago(ts) {
   const s = Math.floor((Date.now() - new Date(ts)) / 1000);
-  if (s < 5) return "just now";
+  if (s < 5) return "Just now";
   if (s < 60) return s + "s ago";
   if (s < 3600) return Math.floor(s/60) + "m ago";
   return Math.floor(s/3600) + "h ago";
@@ -497,42 +703,43 @@ function ago(ts) {
 
 function renderTable() {
   const q    = (document.getElementById("search").value || "").toLowerCase();
-  const data = devices.filter(d =>
-    !q || d.device.toLowerCase().includes(q) || d.ip.toLowerCase().includes(q));
+  const now  = Date.now();
+  const data = devices
+    .filter(d => !q || d.device.toLowerCase().includes(q) || d.ip.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const ao = !a.blocked && (now - new Date(a.lastSeen)) < THRESH;
+      const bo = !b.blocked && (now - new Date(b.lastSeen)) < THRESH;
+      return ao !== bo ? bo - ao : new Date(b.lastSeen) - new Date(a.lastSeen);
+    });
 
-  const now = Date.now();
-  data.sort((a, b) => {
-    const ao = !a.blocked && (now - new Date(a.lastSeen)) < THRESH;
-    const bo = !b.blocked && (now - new Date(b.lastSeen)) < THRESH;
-    return ao !== bo ? bo - ao : new Date(b.lastSeen) - new Date(a.lastSeen);
-  });
+  document.getElementById("dev-count").textContent =
+    data.length + " device" + (data.length !== 1 ? "s" : "");
 
-  document.getElementById("dev-count").textContent = data.length + " device" + (data.length !== 1 ? "s" : "");
   const tb = document.getElementById("tbody");
   if (!data.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty-msg">${q ? "No matching devices" : "No devices connected yet"}</td></tr>`;
+    tb.innerHTML = `<tr class="empty-row"><td colspan="6">${q ? "No devices match your search." : "No devices connected yet."}</td></tr>`;
     return;
   }
   tb.innerHTML = data.map(d => {
     const online = !d.blocked && (now - new Date(d.lastSeen)) < THRESH;
-    let stCell, actCell;
+    let badge, action;
     if (d.blocked) {
-      stCell  = `<span class="bdot r">&#9679;</span><span class="badge badge-blocked">BLOCKED</span>`;
-      actCell = `<button class="unblock-btn" onclick="doUnblock('${esc(d.device)}')">UNBLOCK</button>`;
+      badge  = `<span class="status-badge sb-blocked"><span class="sb-dot"></span>Blocked</span>`;
+      action = `<button class="action-unblock" onclick="doUnblock('${esc(d.device)}')">Unblock</button>`;
     } else if (online) {
-      stCell  = `<span class="bdot g blink">&#9679;</span><span class="badge badge-live">ONLINE</span>`;
-      actCell = `<button class="block-btn" onclick="doBlock('${esc(d.device)}')">BLOCK</button>`;
+      badge  = `<span class="status-badge sb-online"><span class="sb-dot"></span>Online</span>`;
+      action = `<button class="action-block" onclick="doBlock('${esc(d.device)}')">Block</button>`;
     } else {
-      stCell  = `<span class="bdot d">&#9679;</span><span class="badge badge-idle">OFFLINE</span>`;
-      actCell = `<button class="block-btn" onclick="doBlock('${esc(d.device)}')">BLOCK</button>`;
+      badge  = `<span class="status-badge sb-offline"><span class="sb-dot"></span>Offline</span>`;
+      action = `<button class="action-block" onclick="doBlock('${esc(d.device)}')">Block</button>`;
     }
     return `<tr>
-      <td>${stCell}</td>
-      <td class="cell-dev">${esc(d.device)}</td>
-      <td class="cell-ip">${esc(d.ip)}</td>
-      <td class="cell-dim">${d.requests}</td>
-      <td class="cell-dim">${ago(d.lastSeen)}</td>
-      <td>${actCell}</td>
+      <td>${badge}</td>
+      <td class="td-device">${esc(d.device)}</td>
+      <td class="td-ip">${esc(d.ip)}</td>
+      <td class="td-dim">${d.requests.toLocaleString()}</td>
+      <td class="td-dim">${ago(d.lastSeen)}</td>
+      <td>${action}</td>
     </tr>`;
   }).join("");
 }
@@ -552,67 +759,62 @@ function updateStats() {
 }
 
 function doBlock(name) {
-  if (!confirm("Block " + name + "?")) return;
+  if (!confirm("Block " + name + "? Their connection will be cut.")) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ cmd: "block", device: name }));
-    toast("Blocked " + name, "var(--red)");
+    toast("Blocked " + name);
   }
 }
 function doUnblock(name) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ cmd: "unblock", device: name }));
-    toast("Unblocked " + name, "var(--green)");
+    toast("Unblocked " + name);
   }
 }
 
-// ── Proxy Fetch ────────────────────────────────────────────────────────────────
+// ── Proxy fetch ────────────────────────────────────────────────────────────────
 async function doFetch() {
   const url    = document.getElementById("fetch-url").value.trim();
   const method = document.getElementById("fetch-method").value;
-  const srvSel = document.getElementById("fetch-server-sel").value;
-  if (!url) { toast("Enter a URL first", "var(--warn)"); return; }
+  const sel    = document.getElementById("fetch-server-sel").value;
+  if (!url) { toast("Enter a URL first"); return; }
 
-  let headersObj = {};
-  try {
-    const hv = document.getElementById("fetch-headers").value.trim();
-    if (hv) headersObj = JSON.parse(hv);
-  } catch { toast("Invalid JSON in headers", "var(--red)"); return; }
+  let hdrs = {};
+  try { const h = document.getElementById("fetch-headers").value.trim(); if (h) hdrs = JSON.parse(h); }
+  catch { toast("Invalid JSON in headers"); return; }
 
-  const bodyText = document.getElementById("fetch-body").value.trim() || undefined;
-  const btn = document.getElementById("fetch-btn");
-  btn.disabled = true; btn.textContent = "⏳ SENDING…";
+  const body = document.getElementById("fetch-body").value.trim() || undefined;
+  const btn  = document.getElementById("fetch-btn");
+  btn.disabled = true; btn.textContent = "Sending…";
 
-  const srvList = servers();
-  let tryServers = srvSel === "auto" ? srvList : [srvList[parseInt(srvSel)]].filter(Boolean);
-  if (!tryServers.length) { toast("Server not available", "var(--warn)"); btn.disabled = false; btn.textContent = "▶ SEND REQUEST"; return; }
-
-  const t0 = Date.now();
+  const list = servers();
+  const try_ = sel === "auto" ? list : [list[parseInt(sel)]].filter(Boolean);
+  const t0   = Date.now();
   let lastErr = "";
 
-  for (const srv of tryServers) {
-    const httpUrl = srv.replace(/^wss?:\/\//, "https://").replace(/\/$/, "") + "/fetch";
+  for (const srv of try_) {
+    const httpUrl = srv.replace(/^wss?:\/\//, "https://") + "/fetch";
     try {
-      const res = await fetch(httpUrl, {
+      const r    = await fetch(httpUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, method, headers: headersObj, body: bodyText, token: cfg.token }),
+        body: JSON.stringify({ url, method, headers: hdrs, body, token: cfg.token }),
       });
-      const json = await res.json();
+      const json = await r.json();
       showResponse(json, Date.now() - t0);
-      btn.disabled = false; btn.textContent = "▶ SEND REQUEST";
+      btn.disabled = false; btn.textContent = "Send Request";
       return;
     } catch (e) { lastErr = e.message; }
   }
-
   showError(lastErr || "All servers unreachable");
-  btn.disabled = false; btn.textContent = "▶ SEND REQUEST";
+  btn.disabled = false; btn.textContent = "Send Request";
 }
 
 function showResponse(json, ms) {
-  document.getElementById("resp-wrap").style.display = "block";
+  document.getElementById("resp-wrap").style.display = "";
   const sc = document.getElementById("resp-status-code");
   if (json.error) {
-    sc.textContent = "ERROR"; sc.className = "resp-status err";
+    sc.textContent = "Error"; sc.className = "resp-code err";
     document.getElementById("resp-status-text").textContent = json.error;
     document.getElementById("resp-time").textContent = "";
     document.getElementById("resp-hdrs").textContent = "";
@@ -620,20 +822,20 @@ function showResponse(json, ms) {
     return;
   }
   sc.textContent = json.status;
-  sc.className = "resp-status " + (json.status < 300 ? "ok" : json.status < 400 ? "warn" : "err");
+  sc.className   = "resp-code " + (json.status < 300 ? "ok" : json.status < 400 ? "warn" : "err");
   document.getElementById("resp-status-text").textContent = json.statusText;
-  document.getElementById("resp-time").textContent = ms + "ms";
+  document.getElementById("resp-time").textContent = ms + " ms";
   document.getElementById("resp-hdrs").textContent =
-    Object.entries(json.headers || {}).map(([k,v]) => k+": "+v).join("\n") || "(no headers)";
-  let displayed = json.body || "";
-  try { displayed = JSON.stringify(JSON.parse(json.body), null, 2); } catch {}
-  document.getElementById("resp-body").textContent = displayed;
+    Object.entries(json.headers || {}).map(([k,v]) => k + ": " + v).join("\n") || "(no headers)";
+  let body = json.body || "";
+  try { body = JSON.stringify(JSON.parse(json.body), null, 2); } catch {}
+  document.getElementById("resp-body").textContent = body;
 }
 
 function showError(msg) {
-  document.getElementById("resp-wrap").style.display = "block";
-  document.getElementById("resp-status-code").textContent = "ERROR";
-  document.getElementById("resp-status-code").className = "resp-status err";
+  document.getElementById("resp-wrap").style.display = "";
+  document.getElementById("resp-status-code").textContent = "Error";
+  document.getElementById("resp-status-code").className  = "resp-code err";
   document.getElementById("resp-status-text").textContent = msg;
   document.getElementById("resp-time").textContent = "";
   document.getElementById("resp-hdrs").textContent = "";
@@ -642,7 +844,7 @@ function showError(msg) {
 
 function copyResp() {
   navigator.clipboard.writeText(document.getElementById("resp-body").textContent)
-    .then(() => toast("Copied!", "var(--green)"));
+    .then(() => toast("Copied to clipboard"));
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────────
@@ -654,35 +856,33 @@ function populateSettings() {
 }
 
 function saveSettings() {
-  cfg.srv1  = document.getElementById("set-srv1").value.trim() || DEFAULT_SERVERS[0];
-  cfg.srv2  = document.getElementById("set-srv2").value.trim() || DEFAULT_SERVERS[1];
+  cfg.srv1  = document.getElementById("set-srv1").value.trim()  || DEFAULT_SERVERS[0];
+  cfg.srv2  = document.getElementById("set-srv2").value.trim()  || DEFAULT_SERVERS[1];
   cfg.token = document.getElementById("set-token").value.trim();
   LS.set("fp_srv1",  cfg.srv1);
   LS.set("fp_srv2",  cfg.srv2);
   LS.set("fp_token", cfg.token);
-  toast("Saved — reconnecting…", "var(--accent)");
-  clearTimeout(reconnTimeout);
+  clearTimeout(reconnTO);
   if (ws) { try { ws.close(); } catch {} }
+  toast("Saved · reconnecting…");
   setTimeout(() => openWS(0), 400);
 }
 
 function updateInfoPanel() {
-  const srvList = servers();
-  document.getElementById("inf-srv1").textContent   = srvList[0] || "—";
-  document.getElementById("inf-srv2").textContent   = srvList[1] || "not set";
-  document.getElementById("inf-srv2").style.color   = srvList[1] ? "var(--accent)" : "var(--dim3)";
-  document.getElementById("inf-active").textContent = wsConnected ? (srvList[activeSrvIdx] || "—") : "disconnected";
-  document.getElementById("inf-active").style.color = wsConnected ? "var(--green)" : "var(--red)";
-  const states = ["CONNECTING","OPEN","CLOSING","CLOSED"];
-  document.getElementById("inf-wsstate").textContent = ws ? (states[ws.readyState] || "—") : "CLOSED";
+  const list = servers();
+  document.getElementById("inf-srv1").textContent   = list[0] || "—";
+  document.getElementById("inf-srv2").textContent   = list[1] || "not configured";
+  document.getElementById("inf-active").textContent = wsConnected ? (list[activeSrvIdx] || "—") : "Disconnected";
+  const states = ["Connecting","Open","Closing","Closed"];
+  document.getElementById("inf-wsstate").textContent = ws ? (states[ws.readyState] ?? "—") : "Closed";
 }
 
-// Refresh "X ago" timestamps every 5s
-setInterval(() => { if (wsConnected) renderTable(); }, 5000);
+// Refresh "X ago" timestamps every 10s
+setInterval(() => { if (wsConnected) renderTable(); }, 10000);
 
 // ── Auto-login if token is saved ───────────────────────────────────────────────
 if (cfg.token) {
-  document.getElementById("inp-token").value = "••••••••••••";
+  document.getElementById("inp-token").value = "••••••••";
   openWS(0);
 }
 </script>

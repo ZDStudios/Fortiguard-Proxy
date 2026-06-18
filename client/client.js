@@ -2,12 +2,11 @@ const net       = require("net");
 const os        = require("os");
 const WebSocket = require("ws");
 
-// ── Server pool (primary = Render, secondary = Vercel or custom) ───────────────
-// Set SERVER_SECONDARY env var to your Vercel deployment URL
+// ── Server pool — tries in order, falls back automatically ────────────────────
 const SERVERS = [
   process.env.SERVER_PRIMARY   || "wss://fortiguard-proxy.onrender.com",
-  process.env.SERVER_SECONDARY || "",   // e.g. wss://fortiproxy.vercel.app
-].filter(Boolean);
+  process.env.SERVER_SECONDARY || "wss://fortiguard-proxy.vercel.app",
+];
 
 const TOKEN      = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
 const DEVICE     = os.hostname();
