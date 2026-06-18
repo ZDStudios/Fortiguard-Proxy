@@ -12,10 +12,10 @@ const TOKEN      = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
 const DEVICE     = os.hostname();
 const LOCAL_PORT = 8080;
 
-let serverIdx = 0;          // which server we're currently trying
+let serverIdx    = 0;
 let activeServer = SERVERS[0];
 
-function getServer() { return SERVERS[serverIdx % SERVERS.length]; }
+function getServer()  { return SERVERS[serverIdx % SERVERS.length]; }
 
 function nextServer(reason) {
   if (SERVERS.length < 2) return;
@@ -31,8 +31,8 @@ function openControl() {
 
   const url = `${SERVER}/control?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
   const ws  = new WebSocket(url, { rejectUnauthorized: false });
-  let connected = false;
-  let pingTimer = null;
+  let connected  = false;
+  let pingTimer  = null;
 
   ws.on("open", () => {
     connected = true;
@@ -61,7 +61,6 @@ function openControl() {
   ws.on("error", () => {});
   ws.on("close", () => {
     clearInterval(pingTimer);
-    // If we never established a connection, try next server
     if (!connected) nextServer("control failed");
     setTimeout(openControl, connected ? 3000 : 5000);
   });
@@ -74,6 +73,8 @@ const proxy = net.createServer((client) => {
   const headerChunks = [];
   let   headerDone   = false;
   let   ws           = null;
+  let   wsOpened     = false;     // did WS ever reach OPEN?
+  let   method       = "";
   const pending      = [];
 
   client.on("data", (chunk) => {
@@ -92,7 +93,9 @@ const proxy = net.createServer((client) => {
       const afterHeader = combined.slice(sep + 4);
       if (afterHeader.length) pending.push(afterHeader);
 
-      const [method, target] = headerText.split("\r\n")[0].split(" ");
+      const parts = headerText.split("\r\n")[0].split(" ");
+      method      = parts[0];
+      const target = parts[1];
 
       let host, port;
       if (method === "CONNECT") {
@@ -107,13 +110,13 @@ const proxy = net.createServer((client) => {
         } catch { client.destroy(); return; }
       }
 
-      // host/port sent as first WS message body — keeps destination out of URL
-      // so Fortiguard can't block on the target hostname in the WebSocket URL
+      // host/port in first WS message body — destination stays out of URL
       const SERVER = activeServer;
       const wsUrl  = `${SERVER}/tunnel?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
       ws = new WebSocket(wsUrl, { rejectUnauthorized: false });
 
       ws.on("open", () => {
+        wsOpened = true;
         ws.send(JSON.stringify({ host, port }));
         if (method === "CONNECT") {
           client.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: FortiProxy/2.0\r\n\r\n");
@@ -124,16 +127,41 @@ const proxy = net.createServer((client) => {
         pending.length = 0;
       });
 
-      ws.on("message", (data) => client.write(data));
-      ws.on("close",   () => client.destroy());
-      ws.on("error",   (e) => { console.error(`WS: ${e.message}`); client.destroy(); });
+      ws.on("message", (data) => {
+        if (Buffer.isBuffer(data)) client.write(data);
+        else client.write(Buffer.from(data));
+      });
+
+      ws.on("close", () => { if (!client.destroyed) client.destroy(); });
+
+      ws.on("error", (e) => {
+        // Suppress the "closed before established" noise — it's just the browser
+        // closing a connection while the tunnel was still opening (totally normal).
+        if (!e.message.includes("closed before the connection was established")) {
+          console.error(`WS: ${e.message}`);
+        }
+        if (!wsOpened) {
+          // Tunnel never opened — send a proper HTTP error so the browser can
+          // handle/retry gracefully rather than getting a raw connection drop.
+          try {
+            if (method === "CONNECT") {
+              client.write("HTTP/1.1 503 Service Unavailable\r\nProxy-agent: FortiProxy/2.0\r\nContent-Length: 0\r\n\r\n");
+            } else {
+              client.write(
+                "HTTP/1.1 502 Bad Gateway\r\nProxy-agent: FortiProxy/2.0\r\nContent-Length: 0\r\n\r\n"
+              );
+            }
+          } catch {}
+        }
+        if (!client.destroyed) client.destroy();
+      });
     } else {
       pending.push(chunk);
     }
   });
 
-  client.on("close", () => ws && ws.terminate());
-  client.on("error", () => ws && ws.terminate());
+  client.on("close", () => { if (ws && !ws._closed) ws.terminate(); });
+  client.on("error", () => { if (ws && !ws._closed) ws.terminate(); });
 });
 
 proxy.listen(LOCAL_PORT, "127.0.0.1", () => {

@@ -26,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V13"
+APP_VERSION   = "V14"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -827,9 +827,10 @@ class App(ctk.CTk):
                 if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
                     self.after(0, lambda: self._upd_lbl.configure(text=msg, text_color=color))
             except Exception as e:
+                err_msg = str(e)   # capture before Python 3.12 unbinds `e`
                 if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
-                    self.after(0, lambda: self._upd_lbl.configure(
-                        text=f"Check failed ({e})", text_color=_T["error"]))
+                    self.after(0, lambda m=err_msg: self._upd_lbl.configure(
+                        text=f"● {m}", text_color=_T["error"]))
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -1173,6 +1174,8 @@ class App(ctk.CTk):
                     if line.startswith("FORTIPROXY_CMD:"):
                         cmd = line.split(":", 1)[1]
                         self.after(0, lambda c=cmd: self._handle_server_cmd(c))
+                    elif "closed before the connection was established" in line:
+                        pass  # normal browser cleanup noise, suppress
                     else:
                         self._tlog(line, "info")
                 self._proc.wait()
@@ -1233,11 +1236,10 @@ class App(ctk.CTk):
             except Exception: pass
 
     def report_callback_exception(self, exc, val, tb):
+        # Log UI errors but never kill the proxy — they're almost always
+        # harmless (stale widget refs, closed settings window, etc.)
         try:
-            self._disable_proxy()
-            if self._proc:
-                self._proc.terminate()
-            self._tlog(f"Unexpected error: {val}", "error")
+            self._tlog(f"UI error (non-fatal): {val}", "warn")
         except Exception:
             pass
 
@@ -1296,12 +1298,11 @@ class App(ctk.CTk):
 
 if __name__ == "__main__":
     if not _ensure_single_instance():
-        ctypes.windll.user32.MessageBoxW(
-            0,
-            "FortiProxy is already running.\nCheck the system tray icon.",
-            "FortiProxy",
-            0x40 | 0x1000,  # MB_ICONINFORMATION | MB_SETFOREGROUND
-        )
+        # Find and raise the already-running instance's window
+        hwnd = ctypes.windll.user32.FindWindowW(None, "FortiProxy")
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
         sys.exit(0)
     threading.Thread(target=_install_start_menu, daemon=True).start()
     App().mainloop()
