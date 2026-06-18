@@ -873,7 +873,9 @@ class App(ctk.CTk):
 
                 subprocess.Popen(["cmd", "/c", str(bat)], cwd=str(tmp),
                                  creationflags=0x00000010)
-                atexit.register(shutil.rmtree, str(tmp), True)
+                # Do NOT delete the temp folder via atexit — the bat needs to
+                # copy FortiProxy.exe from it AFTER Python exits.
+                # install.bat schedules its own cleanup.
                 self._tlog("Installer launched — FortiProxy will restart", "ok")
                 self.after(2000, self._full_quit)
 
