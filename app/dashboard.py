@@ -26,9 +26,9 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V16"
+APP_VERSION   = "V17"
 REPO          = "ZDStudios/Fortiguard-Proxy"
-VERSION_URL   = "https://zdstudios.github.io/Fortiguard-Proxy/version.txt"
+VERSION_URL   = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/docs/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
 SERVER        = "https://fortiguard-proxy.onrender.com"
