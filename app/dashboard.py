@@ -26,11 +26,12 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V12"
+APP_VERSION   = "V13"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
 SERVER        = "https://fortiguard-proxy.onrender.com"
+SERVER_2      = ""   # Set to your Vercel deployment URL once deployed (https://your-app.vercel.app)
 APPDATA       = os.environ.get("APPDATA", Path.home())
 NODE_DIR      = Path(APPDATA) / "FortiProxy" / "nodejs"
 NODE_EXE      = NODE_DIR / "node.exe"
@@ -369,6 +370,7 @@ class App(ctk.CTk):
         self._closing           = False
         self._blocked           = False
         self._retry_job         = None
+        self._retry2_job        = None
         self._tray              = None
         self._tray_hidden       = False
         self._settings_win      = None
@@ -440,6 +442,8 @@ class App(ctk.CTk):
             self.after_cancel(self._pulse_job)
         if self._retry_job:
             self.after_cancel(self._retry_job)
+        if self._retry2_job:
+            self.after_cancel(self._retry2_job)
         if self._proc:
             self._proc.terminate()
         self._disable_proxy()
@@ -482,12 +486,14 @@ class App(ctk.CTk):
         card = ctk.CTkFrame(self, fg_color=_T["bg_card"], corner_radius=14)
         card.pack(fill="x", padx=18, pady=(14, 6))
 
-        self._server_dot = self._srow(card, "RENDER SERVER", "● CHECKING", _T["warn"])
+        self._server_dot  = self._srow(card, "RENDER",  "● CHECKING", _T["warn"])
         self._sep(card)
-        self._tunnel_dot = self._srow(card, "TUNNEL",        "● OFFLINE",  _T["offline"])
+        self._server2_dot = self._srow(card, "VERCEL",  "● --",       _T["offline"])
         self._sep(card)
-        self._uptime_lbl = self._srow(card, "UPTIME",        "--:--:--",   _T["offline"],
-                                      bold=False)
+        self._tunnel_dot  = self._srow(card, "TUNNEL",  "● OFFLINE",  _T["offline"])
+        self._sep(card)
+        self._uptime_lbl  = self._srow(card, "UPTIME",  "--:--:--",   _T["offline"],
+                                       bold=False)
 
         bf = ctk.CTkFrame(self, fg_color="transparent")
         bf.pack(fill="x", padx=18, pady=8)
@@ -993,30 +999,41 @@ class App(ctk.CTk):
         threading.Thread(target=_run, daemon=True).start()
 
     def _ping_server(self):
-        if self._retry_job:
-            self.after_cancel(self._retry_job)
-            self._retry_job = None
+        for job_attr in ("_retry_job", "_retry2_job"):
+            j = getattr(self, job_attr, None)
+            if j:
+                self.after_cancel(j)
+                setattr(self, job_attr, None)
+
         self._server_dot.configure(text="● CHECKING", text_color=_T["warn"])
         self._refresh_btn.configure(state="disabled")
-        self._tlog("Pinging Render server...", "dim")
+        self._tlog("Pinging servers...", "dim")
 
-        def _check():
+        def _check_one(url, dot_attr, label, retry_attr):
             try:
                 urllib.request.urlopen(
-                    urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
+                    urllib.request.Request(url, headers={"User-Agent": "FortiProxy/2.0"}),
                     timeout=12, context=_SSL_CTX)
-                self.after(0, lambda: self._server_dot.configure(
+                self.after(0, lambda: getattr(self, dot_attr).configure(
                     text="● ONLINE", text_color=_T["connected"]))
-                self._tlog("Render server is online", "ok")
+                self._tlog(f"{label} is online", "ok")
             except Exception as e:
-                self.after(0, lambda: self._server_dot.configure(
+                self.after(0, lambda: getattr(self, dot_attr).configure(
                     text="● OFFLINE", text_color=_T["error"]))
-                self._tlog(f"Server unreachable ({e}) — retrying in 15s", "warn")
-                self._retry_job = self.after(15000, self._ping_server)
+                self._tlog(f"{label} unreachable — retrying in 30s", "warn")
+                setattr(self, retry_attr, self.after(30000, self._ping_server))
             finally:
                 self.after(0, lambda: self._refresh_btn.configure(state="normal"))
 
-        threading.Thread(target=_check, daemon=True).start()
+        def _run():
+            _check_one(SERVER, "_server_dot", "Render", "_retry_job")
+            if SERVER_2:
+                _check_one(SERVER_2, "_server2_dot", "Vercel", "_retry2_job")
+            else:
+                self.after(0, lambda: self._server2_dot.configure(
+                    text="● NOT SET", text_color=_T["dim"]))
+
+        threading.Thread(target=_run, daemon=True).start()
 
     # ── Proxy ─────────────────────────────────────────────────────────────────
 

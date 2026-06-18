@@ -1,29 +1,48 @@
-const net      = require("net");
-const os       = require("os");
+const net       = require("net");
+const os        = require("os");
 const WebSocket = require("ws");
 
-const SERVER     = "wss://fortiguard-proxy.onrender.com";
+// ── Server pool (primary = Render, secondary = Vercel or custom) ───────────────
+// Set SERVER_SECONDARY env var to your Vercel deployment URL
+const SERVERS = [
+  process.env.SERVER_PRIMARY   || "wss://fortiguard-proxy.onrender.com",
+  process.env.SERVER_SECONDARY || "",   // e.g. wss://fortiproxy.vercel.app
+].filter(Boolean);
+
 const TOKEN      = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
 const DEVICE     = os.hostname();
 const LOCAL_PORT = 8080;
 
+let serverIdx = 0;          // which server we're currently trying
+let activeServer = SERVERS[0];
+
+function getServer() { return SERVERS[serverIdx % SERVERS.length]; }
+
+function nextServer(reason) {
+  if (SERVERS.length < 2) return;
+  serverIdx++;
+  activeServer = getServer();
+  console.log(`[FortiProxy] ${reason} — switching to ${activeServer}`);
+}
+
 // ── Control channel ────────────────────────────────────────────────────────────
-// Persistent WebSocket for receiving admin commands (block/unblock).
 function openControl() {
+  const SERVER = getServer();
+  activeServer = SERVER;
+
   const url = `${SERVER}/control?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
   const ws  = new WebSocket(url, { rejectUnauthorized: false });
+  let connected = false;
+  let pingTimer = null;
 
   ws.on("open", () => {
-    console.log("[FortiProxy] Control channel connected");
-    // Ping every 20s — Render kills idle WebSockets after 30s
-    const ping = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
-      } else {
-        clearInterval(ping);
-      }
+    connected = true;
+    console.log(`[FortiProxy] Control connected: ${SERVER}`);
+    pingTimer = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+      else clearInterval(pingTimer);
     }, 20000);
-    ws.once("close", () => clearInterval(ping));
+    ws.once("close", () => clearInterval(pingTimer));
   });
 
   ws.on("message", (data) => {
@@ -31,7 +50,6 @@ function openControl() {
       const msg = JSON.parse(data.toString());
       if (msg.cmd === "block") {
         console.log("[FortiProxy] Blocked by server admin");
-        // Special line dashboard.py looks for to show the blocked status
         console.log("FORTIPROXY_CMD:block");
         setTimeout(() => process.exit(0), 150);
       } else if (msg.cmd === "unblock") {
@@ -43,8 +61,10 @@ function openControl() {
 
   ws.on("error", () => {});
   ws.on("close", () => {
-    // Reconnect after 5 seconds (unless we're shutting down)
-    setTimeout(openControl, 5000);
+    clearInterval(pingTimer);
+    // If we never established a connection, try next server
+    if (!connected) nextServer("control failed");
+    setTimeout(openControl, connected ? 3000 : 5000);
   });
 }
 
@@ -65,7 +85,7 @@ const proxy = net.createServer((client) => {
     if (!headerDone) {
       headerChunks.push(chunk);
       const combined = Buffer.concat(headerChunks);
-      const sep = combined.indexOf("\r\n\r\n");
+      const sep      = combined.indexOf("\r\n\r\n");
       if (sep === -1) return;
 
       headerDone = true;
@@ -88,17 +108,14 @@ const proxy = net.createServer((client) => {
         } catch { client.destroy(); return; }
       }
 
-      // host/port sent as first WS message, NOT in the URL —
-      // keeps destination out of the URL so Fortiguard can't block on it
-      const wsUrl =
-        `${SERVER}/tunnel` +
-        `?token=${encodeURIComponent(TOKEN)}` +
-        `&device=${encodeURIComponent(DEVICE)}`;
-
+      // host/port sent as first WS message body — keeps destination out of URL
+      // so Fortiguard can't block on the target hostname in the WebSocket URL
+      const SERVER = activeServer;
+      const wsUrl  = `${SERVER}/tunnel?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
       ws = new WebSocket(wsUrl, { rejectUnauthorized: false });
 
       ws.on("open", () => {
-        ws.send(JSON.stringify({ host, port }));   // tell server where to connect
+        ws.send(JSON.stringify({ host, port }));
         if (method === "CONNECT") {
           client.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: FortiProxy/2.0\r\n\r\n");
           for (const d of pending) ws.send(d);
@@ -123,5 +140,6 @@ const proxy = net.createServer((client) => {
 proxy.listen(LOCAL_PORT, "127.0.0.1", () => {
   console.log(`[FortiProxy] Proxy ready on 127.0.0.1:${LOCAL_PORT}`);
   console.log(`[FortiProxy] Device: ${DEVICE}`);
-  console.log(`[FortiProxy] Tunnel: ${SERVER}`);
+  console.log(`[FortiProxy] Primary: ${SERVERS[0]}`);
+  if (SERVERS[1]) console.log(`[FortiProxy] Backup: ${SERVERS[1]}`);
 });
