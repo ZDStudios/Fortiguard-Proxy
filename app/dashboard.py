@@ -26,8 +26,9 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V14"
+APP_VERSION   = "V15"
 REPO          = "ZDStudios/Fortiguard-Proxy"
+VERSION_URL   = "https://zdstudios.github.io/Fortiguard-Proxy/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
 BOOT_REG      = r"Software\Microsoft\Windows\CurrentVersion\Run"
 SERVER        = "https://fortiguard-proxy.onrender.com"
@@ -792,26 +793,20 @@ class App(ctk.CTk):
 
         def _run():
             try:
-                url = f"https://api.github.com/repos/{REPO}/releases/latest"
                 req = urllib.request.Request(
-                    url, headers={"User-Agent": "FortiProxy/2.0",
-                                  "Accept": "application/vnd.github+json"})
+                    VERSION_URL, headers={"User-Agent": "FortiProxy/2.0"})
                 with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as r:
-                    data = json.loads(r.read())
-                latest = data.get("tag_name", "").strip()
+                    latest = r.read().decode().strip().splitlines()[0].strip()
                 if not latest:
-                    raise RuntimeError("No release tag found")
+                    raise RuntimeError("Empty version file")
 
                 def vnum(s):
                     try: return int(s.lstrip("Vv"))
                     except ValueError: return 0
 
                 if vnum(latest) > vnum(APP_VERSION):
-                    asset = next(
-                        (a for a in data.get("assets", [])
-                         if a.get("name", "").endswith(".zip")), None)
                     self._update_download_url = (
-                        asset["browser_download_url"] if asset else None)
+                        f"https://raw.githubusercontent.com/{REPO}/main/FortiProxy-{latest}.zip")
                     msg   = f"● {latest} available!"
                     color = _T["warn"]
                     self._tlog(f"Update available: {latest} (you have {APP_VERSION})", "warn")
@@ -827,7 +822,7 @@ class App(ctk.CTk):
                 if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
                     self.after(0, lambda: self._upd_lbl.configure(text=msg, text_color=color))
             except Exception as e:
-                err_msg = str(e)   # capture before Python 3.12 unbinds `e`
+                err_msg = str(e)
                 if hasattr(self, "_upd_lbl") and self._upd_lbl.winfo_exists():
                     self.after(0, lambda m=err_msg: self._upd_lbl.configure(
                         text=f"● {m}", text_color=_T["error"]))
@@ -893,13 +888,10 @@ class App(ctk.CTk):
 
         def _run():
             try:
-                url = f"https://api.github.com/repos/{REPO}/releases/latest"
                 req = urllib.request.Request(
-                    url, headers={"User-Agent": "FortiProxy/2.0",
-                                  "Accept": "application/vnd.github+json"})
+                    VERSION_URL, headers={"User-Agent": "FortiProxy/2.0"})
                 with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as r:
-                    data = json.loads(r.read())
-                latest = data.get("tag_name", "").strip()
+                    latest = r.read().decode().strip().splitlines()[0].strip()
                 if not latest:
                     return
 
@@ -908,11 +900,8 @@ class App(ctk.CTk):
                     except ValueError: return 0
 
                 if vnum(latest) > vnum(APP_VERSION):
-                    asset = next(
-                        (a for a in data.get("assets", [])
-                         if a.get("name", "").endswith(".zip")), None)
                     self._update_download_url = (
-                        asset["browser_download_url"] if asset else None)
+                        f"https://raw.githubusercontent.com/{REPO}/main/FortiProxy-{latest}.zip")
                     self.after(0, lambda: self._show_update_prompt(latest))
             except Exception:
                 pass

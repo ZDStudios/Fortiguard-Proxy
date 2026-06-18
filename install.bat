@@ -3,6 +3,7 @@ setlocal
 
 set "INSTALL_DIR=%APPDATA%\FortiProxy"
 set "EXE=%~dp0FortiProxy.exe"
+set "STAGE_EXE=%TEMP%\FortiProxy_update_new.exe"
 
 :: Capture temp dir path (strip trailing backslash for PowerShell)
 set "TMP_DIR=%~dp0"
@@ -16,10 +17,21 @@ if not exist "%EXE%" (
 
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
+:: Stage EXE to %TEMP% BEFORE signaling quit.
+:: Older versions of FortiProxy delete the temp folder via atexit when Python
+:: exits, so we must copy the EXE out to a safe location first.
+echo Staging update...
+copy /Y "%EXE%" "%STAGE_EXE%" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Could not stage FortiProxy.exe to temp location.
+    pause
+    exit /b 1
+)
+
 :: Signal FortiProxy to quit gracefully (cleans up tray icon properly)
 echo Stopping FortiProxy...
 echo quit > "%APPDATA%\FortiProxy\.quit_signal"
-timeout /t 4 /nobreak >nul
+timeout /t 5 /nobreak >nul
 
 :: Kill any remaining FortiProxy and node processes
 taskkill /IM node.exe /F >nul 2>&1
@@ -27,13 +39,16 @@ taskkill /IM FortiProxy.exe /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 echo Installing FortiProxy...
-copy /Y "%EXE%" "%INSTALL_DIR%\FortiProxy.exe" >nul 2>&1
+copy /Y "%STAGE_EXE%" "%INSTALL_DIR%\FortiProxy.exe" >nul 2>&1
 
 if errorlevel 1 (
     echo ERROR: Failed to copy FortiProxy.exe to %INSTALL_DIR%
     pause
     exit /b 1
 )
+
+:: Cleanup staged file
+del /F /Q "%STAGE_EXE%" >nul 2>&1
 
 :: Remove "downloaded from internet" mark so Windows doesn't restrict it
 powershell -WindowStyle Hidden -Command "Unblock-File -Path '%INSTALL_DIR%\FortiProxy.exe'" >nul 2>&1
