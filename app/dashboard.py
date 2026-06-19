@@ -26,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V17"
+APP_VERSION   = "V18"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 VERSION_URL   = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/docs/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -1040,7 +1040,8 @@ class App(ctk.CTk):
     def _enable_proxy(self):
         try:
             k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-            winreg.SetValueEx(k, "ProxyServer",   0, winreg.REG_SZ,    "127.0.0.1:8080")
+            winreg.SetValueEx(k, "ProxyServer",   0, winreg.REG_SZ,
+                              "socks=127.0.0.1:1080;http=127.0.0.1:8080;https=127.0.0.1:8080")
             winreg.SetValueEx(k, "ProxyEnable",   0, winreg.REG_DWORD, 1)
             winreg.SetValueEx(k, "ProxyOverride", 0, winreg.REG_SZ,
                               "localhost;127.*;10.*;172.16.*;192.168.*;<local>")
