@@ -185,6 +185,12 @@ const socks5 = net.createServer((client) => {
   const onData = (chunk) => {
     buf = Buffer.concat([buf, chunk]);
 
+    // Reject SOCKS4/4a — Windows registry "socks=" sends SOCKS4 not SOCKS5
+    if (step === 0 && buf.length >= 1 && buf[0] !== 0x05) {
+      client.destroy();
+      return;
+    }
+
     // ── Step 0: auth negotiation ──────────────────────────────────────────
     if (step === 0) {
       if (buf.length < 2) return;
