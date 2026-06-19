@@ -167,6 +167,11 @@ const httpProxy = net.createServer((client) => {
   client.on("error", () => {});
 });
 
+httpProxy.on("error", (e) => {
+  console.error(`[FortiProxy] HTTP proxy failed to start: ${e.message}`);
+  process.exit(1);
+});
+
 httpProxy.listen(HTTP_PORT, "127.0.0.1", () => {
   console.log(`[FortiProxy] HTTP proxy  on 127.0.0.1:${HTTP_PORT}`);
   console.log(`[FortiProxy] Device: ${DEVICE}`);
@@ -256,6 +261,11 @@ const socks5 = net.createServer((client) => {
 
   client.on("data", onData);
   client.on("error", () => {});
+});
+
+socks5.on("error", (e) => {
+  // Port 1080 may be taken by another app — HTTP proxy on 8080 still works
+  console.log(`[FortiProxy] SOCKS5 unavailable (${e.code}) — continuing without it`);
 });
 
 socks5.listen(SOCKS_PORT, "127.0.0.1", () => {
