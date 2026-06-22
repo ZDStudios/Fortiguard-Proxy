@@ -26,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V21"
+APP_VERSION   = "V22"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 VERSION_URL   = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/docs/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -1043,15 +1043,7 @@ class App(ctk.CTk):
             winreg.SetValueEx(k, "ProxyServer",   0, winreg.REG_SZ,    "127.0.0.1:8080")
             winreg.SetValueEx(k, "ProxyEnable",   0, winreg.REG_DWORD, 1)
             winreg.SetValueEx(k, "ProxyOverride", 0, winreg.REG_SZ,
-                              # Direct-connect list: LAN + download platforms that break
-                              # when tunnelled (Steam, Epic, Xbox, Windows Update, etc.)
-                              "localhost;127.*;10.*;172.16.*;192.168.*;"
-                              "*.steampowered.com;*.steamcontent.com;*.steam.com;"
-                              "*.steamgames.com;*.valvesoftware.com;*.valve.net;"
-                              "*.epicgames.com;*.unrealengine.com;*.epicgames.dev;"
-                              "*.xboxlive.com;*.xbox.com;*.microsoft.com;*.windowsupdate.com;"
-                              "*.gog.com;*.gogcdn.net;"
-                              "<local>")
+                              "localhost;127.*;10.*;172.16.*;192.168.*;<local>")
             try: winreg.DeleteValue(k, "AutoConfigURL")
             except OSError: pass
             winreg.CloseKey(k)

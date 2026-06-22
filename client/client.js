@@ -78,9 +78,13 @@ function openTunnel(client, method, host, port, initialData) {
   let wsOpened = false;
   const pending = initialData && initialData.length ? [initialData] : [];
 
+  // Keep TCP socket alive for long-lived connections (Steam CM, etc.)
+  client.setKeepAlive(true, 15000);
+  client.setTimeout(0); // no idle timeout
+
   const SERVER = activeServer;
   const wsUrl  = `${SERVER}/tunnel?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
-  const ws     = new WebSocket(wsUrl, { rejectUnauthorized: false });
+  const ws     = new WebSocket(wsUrl, { rejectUnauthorized: false, perMessageDeflate: false });
 
   ws.on("open", () => {
     wsOpened = true;
