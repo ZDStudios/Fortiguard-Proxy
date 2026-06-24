@@ -446,6 +446,7 @@ const DEFAULT_SERVERS = [
 const LS = {
   get(k)   { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
   set(k,v) { try { localStorage.setItem(k, v); } catch {} },
+  remove(k){ try { localStorage.removeItem(k); } catch {} },
 };
 
 let cfg = {
@@ -587,8 +588,11 @@ function openWS(idx) {
     updateInfoPanel();
 
     if (ev.code === 4001) {
-      // Auth rejected
-      document.getElementById("login-err").textContent = "Invalid admin token. Check your ADMIN_TOKEN env var.";
+      // Auth rejected — clear saved token so the placeholder "••••••••" isn't re-submitted
+      cfg.token = "";
+      LS.remove("fp_token");
+      document.getElementById("inp-token").value = "";
+      document.getElementById("login-err").textContent = "Invalid admin token — please re-enter it below.";
       showPage("login");
       document.getElementById("subnav").classList.remove("show");
       document.getElementById("logout-btn").style.display = "none";
