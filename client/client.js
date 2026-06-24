@@ -1,5 +1,6 @@
 const net       = require("net");
 const os        = require("os");
+const crypto    = require("crypto");
 const WebSocket = require("ws");
 
 // ── Server pool — tries in order, falls back automatically ────────────────────
@@ -8,7 +9,10 @@ const SERVERS = [
   process.env.SERVER_SECONDARY || "wss://fortiguard-proxy.vercel.app",
 ];
 
-const TOKEN      = process.env.PROXY_TOKEN || "fortiguardsucks!!!";
+// ── Layer 3: Token obfuscation — XOR-encoded so strings-scan can't extract it ─
+// Decodes to the default PROXY_TOKEN at runtime only.
+const _EK = [0x3C,0x35,0x28,0x2E,0x33,0x3D,0x2F,0x3B,0x28,0x3E,0x29,0x2F,0x39,0x31,0x29,0x7B,0x7B,0x7B];
+const TOKEN      = process.env.PROXY_TOKEN || String.fromCharCode(..._EK.map(b => b ^ 0x5A));
 const DEVICE     = os.hostname();
 const HTTP_PORT  = 8080;
 const SOCKS_PORT = 1080;
@@ -25,18 +29,28 @@ function nextServer(reason) {
   console.log(`[FortiProxy] ${reason} — switching to ${activeServer}`);
 }
 
+// ── Layer 2: Build HMAC auth message ──────────────────────────────────────────
+function makeAuth() {
+  const ts    = Date.now().toString();
+  const nonce = crypto.randomBytes(8).toString("hex");
+  const sig   = crypto.createHmac("sha256", TOKEN)
+                      .update(`${ts}:${DEVICE}:${nonce}`)
+                      .digest("hex");
+  return JSON.stringify({ type: "auth", device: DEVICE, ts, nonce, sig });
+}
+
 // ── Control channel ────────────────────────────────────────────────────────────
 function openControl() {
   const SERVER = getServer();
   activeServer = SERVER;
 
-  const url = `${SERVER}/control?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
-  const ws  = new WebSocket(url, { rejectUnauthorized: false });
-  let connected  = false;
-  let pingTimer  = null;
+  const ws = new WebSocket(`${SERVER}/control`, { rejectUnauthorized: false });
+  let connected = false;
+  let pingTimer = null;
 
   ws.on("open", () => {
     connected = true;
+    ws.send(makeAuth());
     console.log(`[FortiProxy] Control connected: ${SERVER}`);
     pingTimer = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
@@ -72,22 +86,20 @@ openControl();
 // ── Shared WebSocket tunnel ────────────────────────────────────────────────────
 // Opens a WS tunnel to the server for a given host:port and pipes it to/from
 // the already-connected local TCP client socket.
-// `method`      — "CONNECT" (for HTTP proxy) or "TUNNEL" (for SOCKS5)
-// `initialData` — Buffer already received from client before tunnel opened
 function openTunnel(client, method, host, port, initialData) {
   let wsOpened = false;
   const pending = initialData && initialData.length ? [initialData] : [];
 
-  // Keep TCP socket alive for long-lived connections (Steam CM, etc.)
   client.setKeepAlive(true, 15000);
-  client.setTimeout(0); // no idle timeout
+  client.setTimeout(0);
 
   const SERVER = activeServer;
-  const wsUrl  = `${SERVER}/tunnel?token=${encodeURIComponent(TOKEN)}&device=${encodeURIComponent(DEVICE)}`;
-  const ws     = new WebSocket(wsUrl, { rejectUnauthorized: false, perMessageDeflate: false });
+  const ws     = new WebSocket(`${SERVER}/tunnel`, { rejectUnauthorized: false, perMessageDeflate: false });
 
   ws.on("open", () => {
     wsOpened = true;
+    // Layer 2: send HMAC auth first, then the tunnel init
+    ws.send(makeAuth());
     ws.send(JSON.stringify({ host, port }));
     if (method === "CONNECT") {
       client.write("HTTP/1.1 200 Connection Established\r\nProxy-agent: FortiProxy/2.0\r\n\r\n");
@@ -132,7 +144,7 @@ const httpProxy = net.createServer((client) => {
   let   method       = "";
 
   client.on("data", (chunk) => {
-    if (headerDone) return; // openTunnel took over data events
+    if (headerDone) return;
 
     headerChunks.push(chunk);
     const combined = Buffer.concat(headerChunks);
@@ -160,7 +172,6 @@ const httpProxy = net.createServer((client) => {
       } catch { client.destroy(); return; }
     }
 
-    // For non-CONNECT, the full header+body is the initial data to forward
     const initialData = method === "CONNECT"
       ? (afterHeader.length ? afterHeader : null)
       : Buffer.concat([Buffer.from(headerText + "\r\n\r\n"), afterHeader]);
@@ -184,33 +195,26 @@ httpProxy.listen(HTTP_PORT, "127.0.0.1", () => {
 });
 
 // ── SOCKS5 proxy (port 1080) ───────────────────────────────────────────────────
-// TCP CONNECT only — no BIND, no UDP ASSOCIATE.
-// Chrome/Electron (Discord) uses SOCKS5 and routes WebRTC TURN-TCP through it,
-// which lets voice calls work when UDP is blocked by Fortiguard.
 const socks5 = net.createServer((client) => {
   let buf  = Buffer.alloc(0);
-  let step = 0;   // 0 = auth negotiation, 1 = request
+  let step = 0;
 
   const onData = (chunk) => {
     buf = Buffer.concat([buf, chunk]);
 
-    // Reject SOCKS4/4a — Windows registry "socks=" sends SOCKS4 not SOCKS5
     if (step === 0 && buf.length >= 1 && buf[0] !== 0x05) {
-      client.destroy();
-      return;
+      client.destroy(); return;
     }
 
-    // ── Step 0: auth negotiation ──────────────────────────────────────────
     if (step === 0) {
       if (buf.length < 2) return;
       const nMethods = buf[1];
       if (buf.length < 2 + nMethods) return;
-      client.write(Buffer.from([0x05, 0x00])); // no auth
+      client.write(Buffer.from([0x05, 0x00]));
       buf  = buf.slice(2 + nMethods);
       step = 1;
     }
 
-    // ── Step 1: connection request ────────────────────────────────────────
     if (step === 1) {
       if (buf.length < 4) return;
       const cmd  = buf[1];
@@ -218,19 +222,19 @@ const socks5 = net.createServer((client) => {
 
       let host, port, consumed;
 
-      if (atyp === 0x01) {           // IPv4
+      if (atyp === 0x01) {
         if (buf.length < 10) return;
         host     = `${buf[4]}.${buf[5]}.${buf[6]}.${buf[7]}`;
         port     = buf.readUInt16BE(8);
         consumed = 10;
-      } else if (atyp === 0x03) {    // hostname
+      } else if (atyp === 0x03) {
         if (buf.length < 5) return;
         const len = buf[4];
         if (buf.length < 5 + len + 2) return;
         host     = buf.slice(5, 5 + len).toString();
         port     = buf.readUInt16BE(5 + len);
         consumed = 5 + len + 2;
-      } else if (atyp === 0x04) {    // IPv6
+      } else if (atyp === 0x04) {
         if (buf.length < 22) return;
         const parts = [];
         for (let i = 0; i < 8; i++) parts.push(buf.readUInt16BE(4 + i * 2).toString(16));
@@ -238,26 +242,20 @@ const socks5 = net.createServer((client) => {
         port     = buf.readUInt16BE(20);
         consumed = 22;
       } else {
-        client.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0])); // address type not supported
-        client.destroy();
-        return;
+        client.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0]));
+        client.destroy(); return;
       }
 
       if (cmd !== 0x01) {
-        // Only CONNECT (0x01) supported
-        client.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0])); // command not supported
-        client.destroy();
-        return;
+        client.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0]));
+        client.destroy(); return;
       }
 
       const rest = buf.slice(consumed);
       buf  = Buffer.alloc(0);
       step = 2;
 
-      // SOCKS5 success reply — bound addr 0.0.0.0:0
       client.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 0,0,0,0, 0,0]));
-
-      // Remove our listener; openTunnel will attach its own
       client.removeListener("data", onData);
       openTunnel(client, "TUNNEL", host, port, rest.length ? rest : null);
     }
@@ -268,7 +266,6 @@ const socks5 = net.createServer((client) => {
 });
 
 socks5.on("error", (e) => {
-  // Port 1080 may be taken by another app — HTTP proxy on 8080 still works
   console.log(`[FortiProxy] SOCKS5 unavailable (${e.code}) — continuing without it`);
 });
 
