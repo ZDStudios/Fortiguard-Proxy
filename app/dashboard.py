@@ -26,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V23"
+APP_VERSION   = "V24"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 VERSION_URL   = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/docs/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -377,10 +377,20 @@ class App(ctk.CTk):
         self._settings_win      = None
         self._settings          = _load_settings()
         self._update_download_url = None
+        self._intentional_stop  = False
+        self._restart_count     = 0
+        self._restart_timer     = None
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        _stale_proxy = False
+        try:
+            _k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+            _stale_proxy = bool(winreg.QueryValueEx(_k, "ProxyEnable")[0])
+            winreg.CloseKey(_k)
+        except Exception:
+            pass
         _proxy_emergency_off()
         threading.Thread(target=_kill_stale_proxy, daemon=True).start()
 
@@ -395,6 +405,8 @@ class App(ctk.CTk):
         except Exception: pass
 
         self._log("Dashboard ready", "dim")
+        if _stale_proxy:
+            self._log("Cleared stale proxy from previous crash — click START to reconnect", "warn")
         self._ping_server()
         self.after(1500, self._check_update)
         self.after(3000, self._auto_check_update)
@@ -445,6 +457,9 @@ class App(ctk.CTk):
             self.after_cancel(self._retry_job)
         if self._retry2_job:
             self.after_cancel(self._retry2_job)
+        if self._restart_timer:
+            self.after_cancel(self._restart_timer)
+            self._restart_timer = None
         if self._proc:
             self._proc.terminate()
         self._disable_proxy()
@@ -1111,34 +1126,36 @@ class App(ctk.CTk):
         except Exception as e:
             raise RuntimeError(f"Could not install Node.js: {e}")
 
-    def _start(self):
+    def _start(self, _is_restart=False):
+        self._intentional_stop = False
         self._start_btn.configure(state="disabled", text="  CONNECTING...")
         self._tunnel_dot.configure(text="● CONNECTING", text_color=_T["warn"])
 
         def _run():
-            self._tlog("Checking server...", "dim")
-            try:
-                urllib.request.urlopen(
-                    urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
-                    timeout=12, context=_SSL_CTX)
-                self._tlog("Server online", "ok")
-            except Exception as e:
-                self._tlog(f"Server unreachable ({e}) — trying anyway", "warn")
+            if not _is_restart:
+                self._tlog("Checking server...", "dim")
+                try:
+                    urllib.request.urlopen(
+                        urllib.request.Request(SERVER, headers={"User-Agent": "FortiProxy/2.0"}),
+                        timeout=12, context=_SSL_CTX)
+                    self._tlog("Server online", "ok")
+                except Exception as e:
+                    self._tlog(f"Server unreachable ({e}) — trying anyway", "warn")
 
-            ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
-            if not ws_pkg.exists():
-                if getattr(sys, "frozen", False):
-                    self._tlog("ws module missing from bundle — please rebuild EXE", "error")
-                    self.after(0, self._reset_ui)
-                    return
-                self._tlog("Installing dependencies (one-time)...", "info")
-                r = subprocess.run("npm install", cwd=str(BASE_DIR),
-                                   shell=True, capture_output=True, text=True)
-                if r.returncode != 0:
-                    self._tlog(f"npm install failed: {r.stderr.strip()}", "error")
-                    self.after(0, self._reset_ui)
-                    return
-                self._tlog("Dependencies installed", "ok")
+                ws_pkg = BASE_DIR / "node_modules" / "ws" / "package.json"
+                if not ws_pkg.exists():
+                    if getattr(sys, "frozen", False):
+                        self._tlog("ws module missing from bundle — please rebuild EXE", "error")
+                        self.after(0, self._reset_ui)
+                        return
+                    self._tlog("Installing dependencies (one-time)...", "info")
+                    r = subprocess.run("npm install", cwd=str(BASE_DIR),
+                                       shell=True, capture_output=True, text=True)
+                    if r.returncode != 0:
+                        self._tlog(f"npm install failed: {r.stderr.strip()}", "error")
+                        self.after(0, self._reset_ui)
+                        return
+                    self._tlog("Dependencies installed", "ok")
 
             try:
                 node = self._ensure_node()
@@ -1150,7 +1167,8 @@ class App(ctk.CTk):
             if not self._enable_proxy():
                 self.after(0, self._reset_ui)
                 return
-            self._tlog("System proxy set to 127.0.0.1:8080", "ok")
+            if not _is_restart:
+                self._tlog("System proxy set to 127.0.0.1:8080", "ok")
 
             try:
                 extra = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
@@ -1173,11 +1191,24 @@ class App(ctk.CTk):
             except Exception as e:
                 self._tlog(f"Error starting proxy: {e}", "error")
             finally:
-                self.after(0, self._on_disconnected)
+                unexpected = not self._intentional_stop
+                self.after(0, lambda u=unexpected: self._on_disconnected(unexpected=u))
 
         threading.Thread(target=_run, daemon=True).start()
 
     def _stop(self):
+        self._intentional_stop = True
+        self._restart_count    = 0
+        if self._restart_timer:
+            self.after_cancel(self._restart_timer)
+            self._restart_timer = None
+            # Was waiting to auto-restart with no live process — clean up manually
+            self._disable_proxy()
+            self._tunnel_dot.configure(text="● OFFLINE", text_color=_T["offline"])
+            self._log("Reconnect cancelled — proxy disabled", "warn")
+            self._uptime_lbl.configure(text="--:--:--", text_color=_T["offline"])
+            self._reset_ui()
+            return
         self._tlog("Disconnecting...", "warn")
         self._stop_btn.configure(state="disabled")
         if self._proc:
@@ -1195,6 +1226,12 @@ class App(ctk.CTk):
         if self._tray:
             try: self._tray.icon = _make_tray_image(connected=True)
             except Exception: pass
+        # Reset the auto-restart counter after 30s of stable connection
+        self.after(30000, self._stable_connection_cb)
+
+    def _stable_connection_cb(self):
+        if self._connected:
+            self._restart_count = 0
 
     def _handle_server_cmd(self, cmd):
         if cmd == "block":
@@ -1210,11 +1247,30 @@ class App(ctk.CTk):
             self._blocked = False
             self._log("Unblocked by server admin", "ok")
 
-    def _on_disconnected(self):
+    def _on_disconnected(self, unexpected=False):
         self._connected = False
         if self._pulse_job:
             self.after_cancel(self._pulse_job)
             self._pulse_job = None
+
+        if unexpected and not self._blocked and not self._closing:
+            self._restart_count += 1
+            if self._restart_count <= 5:
+                delay = min(3 * self._restart_count, 15)
+                self._tunnel_dot.configure(text="● RECONNECTING", text_color=_T["warn"])
+                self._log(
+                    f"Proxy dropped — auto-restarting in {delay}s "
+                    f"(attempt {self._restart_count}/5)", "warn")
+                self._start_btn.configure(state="disabled", text="  RECONNECTING...")
+                self._stop_btn.configure(state="normal",
+                                          fg_color=_T["stop_fg"], hover_color=_T["stop_hov"])
+                self._restart_timer = self.after(
+                    delay * 1000, lambda: self._start(_is_restart=True))
+                return
+            else:
+                self._log("Auto-restart failed 5 times — disabling proxy", "error")
+                self._restart_count = 0
+
         self._disable_proxy()
         if not self._blocked:
             self._tunnel_dot.configure(text="● OFFLINE", text_color=_T["offline"])
@@ -1280,6 +1336,9 @@ class App(ctk.CTk):
             self.after_cancel(self._pulse_job)
         if self._retry_job:
             self.after_cancel(self._retry_job)
+        if self._restart_timer:
+            self.after_cancel(self._restart_timer)
+            self._restart_timer = None
         if self._proc:
             self._proc.terminate()
         self._stop_tray()
