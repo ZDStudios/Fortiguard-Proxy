@@ -1,7 +1,25 @@
-node_modules/
+# Secrets — never commit
+secrets.env
+API-KEYS.local.md
 .env
+
+# Build outputs (bare exes never go in git)
 FortiProxy.exe
-__pycache__/
-*.pyc
+fortiproxy-client.exe
 app/build/
 app/FortiProxy.spec
+
+# NOTE: release zips (FortiProxy-V*.zip) ARE tracked on purpose — the in-app
+# auto-updater downloads them from raw.githubusercontent.com/.../main/, so the
+# current version's zip must live in the repo root. Do not ignore them.
+
+# Go
+client/fortiproxy-client
+*.exe~
+
+# Python
+__pycache__/
+*.pyc
+
+# Node (legacy)
+node_modules/

@@ -15,8 +15,16 @@ if %errorlevel% neq 0 (
     pause & exit /b 1
 )
 
+where go >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARN] Go not found. The Go tunnel client can't be built.
+    echo        Install it with:  winget install GoLang.Go
+    echo        (Skip this if fortiproxy-client.exe is already built.)
+    echo.
+)
+
 echo [....] Installing build dependencies...
-pip install pyinstaller customtkinter -q --disable-pip-version-check
+pip install pyinstaller customtkinter pystray pillow -q --disable-pip-version-check
 echo [OK]   Dependencies ready
 echo.
 echo [....] Compiling - this takes 30-60 seconds...

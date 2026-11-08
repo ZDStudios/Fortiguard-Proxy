@@ -18,8 +18,6 @@ if not exist "%EXE%" (
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
 :: Stage EXE to %TEMP% BEFORE signaling quit.
-:: Older versions of FortiProxy delete the temp folder via atexit when Python
-:: exits, so we must copy the EXE out to a safe location first.
 echo Staging update...
 copy /Y "%EXE%" "%STAGE_EXE%" >nul 2>&1
 if errorlevel 1 (
@@ -33,8 +31,8 @@ echo Stopping FortiProxy...
 echo quit > "%APPDATA%\FortiProxy\.quit_signal"
 timeout /t 5 /nobreak >nul
 
-:: Kill any remaining FortiProxy and node processes
-taskkill /IM node.exe /F >nul 2>&1
+:: Kill any remaining FortiProxy and tunnel-client processes
+taskkill /IM fortiproxy-client.exe /F >nul 2>&1
 taskkill /IM FortiProxy.exe /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
@@ -59,7 +57,6 @@ start "" "%INSTALL_DIR%\FortiProxy.exe"
 echo Done!
 
 :: Schedule deletion of this temp folder 8 seconds after we exit
-:: (can't delete it while bat is running from inside it)
 start /b powershell -WindowStyle Hidden -Command "$p='%TMP_DIR%'; Start-Sleep 8; if(Test-Path $p){Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue}"
 
 timeout /t 2 /nobreak >nul

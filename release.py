@@ -2,10 +2,11 @@
 Build FortiProxy, zip it with install.bat, and publish a GitHub release.
 
 Usage:
-    python release.py          # auto-increments version (V7 → V8)
-    python release.py V9       # explicit version
+    python release.py          # auto-increments version (V24 -> V25)
+    python release.py V26      # explicit version
 
 Requires GITHUB_TOKEN env var (repo scope) or will prompt for it.
+Building also needs Go installed and secrets.env present (for the tunnel client).
 """
 import sys
 import os
@@ -36,10 +37,10 @@ def _next_version():
 
 def _build():
     print("[release] Building EXE...")
-    # Kill any running FortiProxy/node so the EXE isn't locked
+    # Kill any running FortiProxy / tunnel client so the EXE isn't locked
     subprocess.run(
         ["powershell", "-Command",
-         "Stop-Process -Name FortiProxy,node -Force -ErrorAction SilentlyContinue"],
+         "Stop-Process -Name FortiProxy,fortiproxy-client -Force -ErrorAction SilentlyContinue"],
         capture_output=True,
     )
     r = subprocess.run([sys.executable, "app/build_exe.py"], cwd=str(ROOT))
@@ -105,7 +106,6 @@ def _create_release(version: str, token: str) -> str:
         "prerelease": False,
     }).encode()
     result = _api("POST", f"https://api.github.com/repos/{REPO}/releases", token, data)
-    # upload_url is a URI template like ...assets{?name,label} — strip the template part
     return result["upload_url"].split("{")[0]
 
 
