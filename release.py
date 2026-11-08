@@ -2,7 +2,7 @@
 Build FortiProxy, zip it with install.bat, and publish a GitHub release.
 
 Usage:
-    python release.py          # auto-increments version (V24 -> V25)
+    python release.py          # auto-increments version (e.g. V25 -> V26)
     python release.py V26      # explicit version
 
 Requires GITHUB_TOKEN env var (repo scope) or will prompt for it.

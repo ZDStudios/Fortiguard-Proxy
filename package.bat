@@ -10,10 +10,10 @@ echo   FortiProxy - Release Packager
 echo  ===================================
 echo.
 
-:: ── Read the version from docs\version.txt (e.g. V25) ────────────────────────
+:: ── Read the version from docs\version.txt (e.g. V26) ────────────────────────
 set "VER="
 if exist "docs\version.txt" set /p VER=<docs\version.txt
-if "%VER%"=="" set "VER=V25"
+if "%VER%"=="" set "VER=V26"
 echo  Version: %VER%
 echo.
 

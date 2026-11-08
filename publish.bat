@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title FortiProxy - Publish V25 to GitHub
+title FortiProxy - Publish to GitHub
 
 :: Publishes this project to GitHub as a new commit on top of the existing
 :: history (no force-push). It also commits FortiProxy-<ver>.zip to the repo
@@ -20,10 +20,10 @@ if %errorlevel% neq 0 (
     pause & exit /b 1
 )
 
-:: Version label from docs\version.txt (e.g. V25)
+:: Version label from docs\version.txt (e.g. V26)
 set "VER="
 if exist "%SRC%docs\version.txt" set /p VER=<"%SRC%docs\version.txt"
-if "%VER%"=="" set "VER=V25"
+if "%VER%"=="" set "VER=V26"
 set "ZIP=FortiProxy-%VER%.zip"
 
 :: The release zip MUST exist, or existing installs can't auto-update.
@@ -62,8 +62,8 @@ if %errorlevel% equ 0 (
     pause & exit /b 0
 )
 
-git commit -m "%VER%: hosted proxy backend, Go tunnel client, redesigned app, self-healing" ^
-           -m "Backend moves to proxy.zdstudios.network; Go yamux tunnel client (HTTP+SOCKS5, 4 links); redesigned desktop app; crash recovery (panic isolation, guardian process, clear-proxy on exit, app poll, launch heal); GitHub Pages panel removed. Release zip committed so existing installs auto-update." ^
+git commit -m "%VER%: publish build" ^
+           -m "Code + FortiProxy-%VER%.zip + docs/version.txt=%VER% so existing installs auto-update." ^
            -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 if %errorlevel% neq 0 ( echo [ERROR] Commit failed. & pause & exit /b 1 )
 

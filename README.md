@@ -93,7 +93,7 @@ launch.bat
 
 ## Releasing a new version
 
-The version string lives in `docs/version.txt` (currently **V25**). A release has
+The version string lives in `docs/version.txt` (currently **V26**). A release has
 two halves, and **both** matter for the auto-updater (see below):
 
 1. **Build the zip** — on Windows:
@@ -106,7 +106,7 @@ two halves, and **both** matter for the auto-updater (see below):
 
 2. **Publish to GitHub** — on Windows:
    ```
-   publish-v25.bat
+   publish.bat
    ```
    Clones the repo, syncs the code, **commits `FortiProxy-<version>.zip` to the
    repo root**, and pushes to `main` — preserving all history.
@@ -131,7 +131,7 @@ The installed app checks for updates on launch:
 `FortiProxy-V*.zip` is _not_ git-ignored).** If the zip is only on the Releases
 page, older installs can't find it. Every release must push both the bumped
 `docs/version.txt` and the matching `FortiProxy-<version>.zip` to `main` — which
-is exactly what `publish-v25.bat` does.
+is exactly what `publish.bat` does.
 
 Note: the shipped exe contains the (obfuscated) proxy token by design — it's the
 app users run. Treat every published build as carrying that shared secret, as
