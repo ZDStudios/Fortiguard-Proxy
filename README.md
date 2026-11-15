@@ -18,6 +18,23 @@ it get past filtering that a browser-only proxy can't.
 4. FortiProxy is now installed — you can delete the zip and extracted folder
 5. Search **FortiProxy** in Windows Search to launch it anytime
 
+### If Windows warns about the app
+
+FortiProxy is a new, unsigned program that asks for administrator rights and
+creates a network adapter — the same profile as VPN software — so **Windows
+SmartScreen or Defender may warn about it or flag it the first time**. This is a
+**false positive**: the app isn't malware, it just has no signing certificate yet
+(see [Code signing](#code-signing-and-false-positives)).
+
+To run it anyway:
+
+- **SmartScreen** ("Windows protected your PC"): click **More info → Run anyway**.
+- **Defender flagged / quarantined it:** open **Windows Security → Virus & threat
+  protection → Protection history**, find FortiProxy, and choose **Restore** /
+  **Allow on device**. If it won't run, add the install folder
+  `%APPDATA%\FortiProxy` as an exclusion under **Virus & threat protection →
+  Manage settings → Exclusions**.
+
 ## Usage
 
 1. Open FortiProxy from Windows Search (or the Start Menu)
@@ -125,6 +142,28 @@ is exactly what `publish.bat` does.
 Note: the shipped exe contains the (obfuscated) proxy token by design — it's the
 app users run. Treat every published build as carrying that shared secret, as
 `API.md` explains.
+
+## Code signing and false positives
+
+Because FortiProxy is unsigned, new, and behaves like a VPN (admin + virtual
+adapter + routing all traffic), Windows Defender's machine-learning heuristics
+and SmartScreen reputation checks sometimes flag a fresh build — usually a generic
+`!ml` name like `Wacatac` or `Wacapew`. It is a **false positive**.
+
+The build already avoids the things that make it worse — it is **not** packed
+(no UPX), ships full version metadata (company, description, original filename),
+and is **not** symbol-stripped. But the only way to actually stop the warnings is:
+
+1. **Code-sign `FortiProxy.exe`** with a certificate. An OV certificate reduces
+   detections; an **EV certificate** gives immediate SmartScreen reputation. Sign
+   in `build.ps1` after `go build`, e.g.
+   `signtool sign /fd SHA256 /tr <timestamp-url> /td SHA256 /a FortiProxy.exe`.
+2. **Report false positives to Microsoft** at
+   <https://www.microsoft.com/en-us/wdsi/filesubmission> so the specific build is
+   allowlisted (needed per build until the exe is signed).
+
+Until the exe is signed, expect to tell users about the warning (see
+[If Windows warns about the app](#if-windows-warns-about-the-app)).
 
 ## Secrets
 

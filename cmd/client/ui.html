@@ -290,6 +290,20 @@ input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
         <div class="row"><div class="text"><b>Repair network</b><small>Removes anything a crash left behind. It runs by itself after a crash, so you should rarely need this.</small></div><button class="btn small" id="repair">Repair</button></div>
       </div>
     </section>
+    <section>
+      <h2>Updates</h2>
+      <div class="card">
+        <div class="row"><div class="text"><b>Version</b><small id="verLine">FortiProxy</small></div><button class="btn small" id="checkUpdate">Check for updates</button></div>
+        <div class="desc" id="updateStatus">FortiProxy checks for updates automatically when it starts.</div>
+      </div>
+    </section>
+    <section>
+      <h2>About</h2>
+      <div class="card">
+        <div class="row"><div class="text"><b>Developer</b><small>ZD Studios</small></div></div>
+        <div class="row"><div class="text"><b>Project &amp; source code</b><small>View the code, releases and report issues on GitHub.</small></div><button class="btn small" id="githubBtn">Open GitHub</button></div>
+      </div>
+    </section>
     <p class="about" id="about"></p>
   </div>
   <div id="testSheet"><div class="card" id="testResult"></div></div>
@@ -508,6 +522,34 @@ function showTest(r) {
 
 /* Settings */
 function save() { window.proxySaveSettings(settings).catch(err => showError("Couldn't save settings: " + err)); }
+
+let pendingUpdate = null;
+async function checkForUpdates() {
+  const btn = $("checkUpdate"), status = $("updateStatus");
+  if (pendingUpdate) {
+    status.textContent = "Downloading and installing " + pendingUpdate + "… the app will reopen.";
+    btn.disabled = true;
+    try { await window.proxyApplyUpdate(); }
+    catch (e) { status.textContent = "Update failed: " + e; btn.disabled = false; }
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = "Checking for updates…";
+  try {
+    const r = await window.proxyCheckUpdate();
+    if (r.error) status.textContent = "Couldn't check for updates: " + r.error;
+    else if (r.available) {
+      status.textContent = "Update available: " + r.latest + " — you have " + r.current + ".";
+      pendingUpdate = r.latest;
+      btn.textContent = "Update now";
+    } else {
+      status.textContent = "You're on the latest version (" + r.current + ").";
+    }
+  } catch (e) {
+    status.textContent = "Couldn't check for updates: " + e;
+  }
+  btn.disabled = false;
+}
 function setTheme(name) {
   document.documentElement.dataset.theme = name;
   [...$("themes").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.t === name));
@@ -544,6 +586,12 @@ async function init() {
   });
   settings = await window.proxySettings();
   setTheme(settings.theme);
+  try {
+    const about = await window.proxyAbout();
+    $("verLine").textContent = "FortiProxy " + about.version;
+  } catch {}
+  $("githubBtn").onclick = () => window.proxyOpenRepo();
+  $("checkUpdate").onclick = checkForUpdates;
   bindLimit($("downLimit"), $("downOut"), "downMbps");
   bindLimit($("upLimit"), $("upOut"), "upMbps");
   bindSeg("links-seg", "links", Number, () => $("linksDesc").textContent = LINK_TEXT[settings.links]);

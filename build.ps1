@@ -36,7 +36,11 @@ $code = $LASTEXITCODE
 Pop-Location
 if ($code -ne 0) { throw 'Generating the app icon and manifest failed' }
 
-$ldflags = "-s -w -H=windowsgui " +
+# Note: we deliberately do NOT pass -s -w (symbol/DWARF stripping). Stripped Go
+# binaries read as "packed" to some antivirus heuristics and raise false-positive
+# scores; keeping the symbols makes the build look like ordinary software. The
+# only real fix for Defender/SmartScreen warnings is code-signing the exe.
+$ldflags = "-H=windowsgui " +
     "-X main.serverURL=$($secrets.PROXY_URL) " +
     "-X main.proxyToken=$($secrets.PROXY_TOKEN) " +
     "-X main.appVersion=$version"

@@ -17,64 +17,105 @@ import (
 )
 
 // appVersion is baked in at build time by build.ps1 from docs/version.txt
-// (e.g. "V27"). It is what the updater compares against the published version.
+// (e.g. "V28"). It is what the updater compares against the published version.
 var appVersion = "dev"
 
-const updateRepo = "ZDStudios/Fortiguard-Proxy"
+const (
+	updateRepo = "ZDStudios/Fortiguard-Proxy"
+	developer  = "ZD Studios"
+)
 
-// Where the auto-updater looks. The version file and the matching release zip
-// both live in the repo root on the main branch, served raw by GitHub. This is
-// the same contract the older installs use, so every version can update to the
-// next one.
-func versionURL() string {
-	return "https://raw.githubusercontent.com/" + updateRepo + "/main/docs/version.txt"
+// The version file and the matching release zip both live in the repo root on
+// the main branch, served raw by GitHub — the same contract older installs use,
+// so every version can update to the next one.
+func repoURL() string    { return "https://github.com/" + updateRepo }
+func versionURL() string { return "https://raw.githubusercontent.com/" + updateRepo + "/main/docs/version.txt" }
+func zipURL(v string) string {
+	return "https://raw.githubusercontent.com/" + updateRepo + "/main/FortiProxy-" + v + ".zip"
 }
 
-func zipURL(version string) string {
-	return "https://raw.githubusercontent.com/" + updateRepo + "/main/FortiProxy-" + version + ".zip"
-}
-
-// versionNum turns "V27" (or "v27", " 27 ") into 27 so versions can be compared.
+// versionNum turns "V28" (or "v28", " 28 ") into 28 so versions can be compared.
 func versionNum(v string) int {
-	v = strings.TrimSpace(v)
-	v = strings.TrimPrefix(strings.ToUpper(v), "V")
+	v = strings.TrimPrefix(strings.ToUpper(strings.TrimSpace(v)), "V")
 	n, _ := strconv.Atoi(strings.TrimSpace(v))
 	return n
 }
 
-// checkForUpdate looks for a newer published version and, if the user agrees,
-// downloads it and hands off to install.bat. It never touches anything unless
-// the published version is strictly newer, so a normal launch does nothing.
-func checkForUpdate(engine *Engine) {
-	defer func() { _ = recover() }()
-	logs := engine.Logs
-	client := &http.Client{Timeout: 15 * time.Second}
+// UpdateCheck is the result the Settings "Check for updates" button receives.
+type UpdateCheck struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+	Available bool   `json:"available"`
+	Error     string `json:"error"`
+}
 
+func fetchLatestVersion() (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Get(versionURL())
 	if err != nil {
-		logs.Add("info", "Update check skipped: %v", err)
-		return
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("the server returned HTTP %d", resp.StatusCode)
 	}
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
-	resp.Body.Close()
-	latest := strings.TrimSpace(string(b))
-	if latest == "" || versionNum(latest) <= versionNum(appVersion) {
+	return strings.TrimSpace(string(b)), nil
+}
+
+// checkUpdate reports whether a newer version is published (for the Settings UI).
+func checkUpdate() UpdateCheck {
+	r := UpdateCheck{Current: appVersion}
+	latest, err := fetchLatestVersion()
+	if err != nil {
+		r.Error = err.Error()
+		return r
+	}
+	r.Latest = latest
+	r.Available = versionNum(latest) > versionNum(appVersion)
+	return r
+}
+
+// applyUpdate (the Settings "Update now" button) downloads the latest published
+// version and hands off to install.bat. On success the process exits and does
+// not return; install.bat then relaunches the new build.
+func applyUpdate(engine *Engine) error {
+	latest, err := fetchLatestVersion()
+	if err != nil {
+		return err
+	}
+	if versionNum(latest) <= versionNum(appVersion) {
+		return nil
+	}
+	return downloadAndInstall(engine, latest)
+}
+
+// checkForUpdate runs at launch: if a newer version exists it offers to install.
+// It never touches anything unless the published version is strictly newer.
+func checkForUpdate(engine *Engine) {
+	defer func() { _ = recover() }()
+	latest, err := fetchLatestVersion()
+	if err != nil {
+		engine.Logs.Add("info", "Update check skipped: %v", err)
 		return
 	}
-
-	logs.Add("warn", "A new version is available: %s (you have %s)", latest, appVersion)
+	if versionNum(latest) <= versionNum(appVersion) {
+		return
+	}
+	engine.Logs.Add("warn", "A new version is available: %s (you have %s)", latest, appVersion)
 	msg := fmt.Sprintf("A new version of FortiProxy (%s) is available.\n\nUpdate now? FortiProxy will close briefly and reopen.", latest)
 	if !askYesNo(msg) {
 		return
 	}
-	if err := downloadAndInstall(engine, client, latest); err != nil {
-		logs.Add("error", "Update failed: %v", err)
+	if err := downloadAndInstall(engine, latest); err != nil {
+		engine.Logs.Add("error", "Update failed: %v", err)
 		alert("The update couldn't be installed:\n" + err.Error())
 	}
 }
 
-func downloadAndInstall(engine *Engine, client *http.Client, latest string) error {
+func downloadAndInstall(engine *Engine, latest string) error {
 	engine.Logs.Add("info", "Downloading FortiProxy %s...", latest)
+	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Get(zipURL(latest))
 	if err != nil {
 		return err
@@ -171,4 +212,11 @@ func askYesNo(msg string) bool {
 	const idYes = 6
 	r, _ := windows.MessageBox(0, text, title, windows.MB_YESNO|windows.MB_ICONQUESTION)
 	return r == idYes
+}
+
+// openURL opens a link in the user's default browser.
+func openURL(u string) {
+	cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	_ = cmd.Start()
 }
