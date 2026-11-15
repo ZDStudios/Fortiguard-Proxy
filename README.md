@@ -1,108 +1,99 @@
 # FortiProxy
 
-Routes your traffic through an encrypted tunnel to the hosted proxy at
-`proxy.zdstudios.network`, bypassing Fortiguard web filtering on managed
-networks.
+Routes **all** of your traffic through an encrypted tunnel to the hosted proxy at
+`proxy.zdstudios.network`, bypassing Fortiguard web filtering — and the network's
+DNS — on managed networks.
+
+FortiProxy works like a VPN: it creates a virtual network adapter and sends every
+app's traffic (and every DNS lookup) through the tunnel, so the local network
+never sees where you're going. Creating that adapter needs administrator rights,
+so Windows shows a prompt when you connect. That system-wide routing is what lets
+it get past filtering that a browser-only proxy can't.
 
 ## Installation
 
 1. Go to the [Releases](../../releases/latest) page and download `FortiProxy.zip`
 2. Extract the zip anywhere (Desktop, Downloads, etc.)
-3. Run `install.bat`
+3. Run `install.bat` and approve the Windows prompt
 4. FortiProxy is now installed — you can delete the zip and extracted folder
 5. Search **FortiProxy** in Windows Search to launch it anytime
 
 ## Usage
 
 1. Open FortiProxy from Windows Search (or the Start Menu)
-2. Wait for the **Server** tile to show **Online**
-3. Click **Connect**
-4. Browse normally — all traffic is routed through the tunnel
-5. Click **Disconnect** when done
+2. Click **Connect** and approve the administrator prompt
+3. Wait for it to show **On** — all traffic now goes through the tunnel
+4. Browse normally
+5. Click **Disconnect** when done — your normal network is restored
 
 ## How it works
 
-- `install.bat` copies `FortiProxy.exe` to `%APPDATA%\FortiProxy\` and creates a
-  Start Menu shortcut.
-- The app launches `fortiproxy-client.exe`, which opens a local HTTP proxy on
-  `127.0.0.1:8080` (and a SOCKS5 proxy on `127.0.0.1:1080`), then sets the HTTP
-  proxy as the Windows system proxy.
-- The client keeps **4 WebSocket links** open to `proxy.zdstudios.network`, each
-  carrying a [yamux](https://github.com/hashicorp/yamux)-multiplexed session.
-  Every browser connection becomes one stream, so the links are shared and one
-  stalled request never freezes the others. See `API.md` for the full protocol.
-- Blocking is enforced server-side: if your device is kicked, disabled or
-  banned from the proxy's own dashboard, the tunnel is refused and the app shows
-  the reason.
+- FortiProxy is a single Go application (`cmd/client`) with a built-in webview UI.
+- On connect it creates a virtual network adapter
+  ([sing-tun](https://github.com/sagernet/sing-tun) with a gVisor TCP/IP stack)
+  and routes **all** IPv4/IPv6 traffic through it (`AutoRoute` + `StrictRoute`).
+  Your real LAN, Tailscale and multicast ranges are excluded so printers,
+  casting and file shares keep working.
+- **DNS is captured too.** Lookups (port 53) are sent through the tunnel and
+  resolved by a public resolver on the far side, so the network's own DNS never
+  sees the names you look up. `StrictRoute` stops any lookup leaking around the
+  tunnel.
+- Traffic rides **4 WebSocket links** to `proxy.zdstudios.network`, each a
+  [yamux](https://github.com/hashicorp/yamux)-multiplexed session, so links are
+  shared and one stalled request never freezes the others. See `API.md` for the
+  protocol.
+- Blocking is enforced server-side: if your device is kicked, disabled or banned
+  from the proxy's own dashboard, the tunnel is refused and the app shows why.
 
 ## Reliability & self-healing
 
-A system-wide proxy is only dangerous if it's left pointing at a dead local
-port — then every app loses internet until it's cleared. FortiProxy has several
-independent layers so that can't happen, even after a hard crash:
+A system-wide tunnel is only dangerous if it's left in place after the app dies —
+then apps can lose internet until it's cleared. FortiProxy only ever changes its
+own virtual adapter (never the Wi-Fi or Ethernet driver), and has several layers
+so a crash can't strand you:
 
-1. **Panic isolation** — each connection runs with its own recovery, so one bad
-   request can never take the whole client down.
-2. **Clean-exit cleanup** — the client clears the system proxy on any normal
-   exit, Ctrl-C/close, or panic.
-3. **Guardian process** — the client launches a detached watchdog. If the client
-   dies hard (crash, `taskkill /F`, power event) and nothing is listening on
-   `127.0.0.1:8080`, the guardian clears the proxy.
-4. **App-side poll** — the desktop app checks every 2 seconds; if the proxy is
-   set to our port but the client isn't running, it clears it and resets.
-5. **Auto-restart** — if the client stops unexpectedly while connected, the app
-   restarts it (up to 5 times with backoff).
-6. **Launch heal** — every time FortiProxy starts, it clears any leftover proxy
-   and kills any stale listener, so a bad previous session is undone on open.
-   (Combined with "Start on boot", a reboot fully recovers the machine.)
-
-The proxy is only ever cleared when it still points at FortiProxy, so an
-unrelated proxy you configured yourself is never touched.
+1. **Process-tied adapter** — the adapter, its routes and firewall filters are
+   bound to the app's process, so Windows removes them when the process dies.
+2. **Watchdog** — a detached second process waits for the app to exit; if it died
+   while connected, the watchdog removes anything left behind and flushes DNS.
+3. **Launch repair** — if the watchdog was killed too, the app repairs the
+   network on its next start.
+4. **Fail-safe** — if the server is unreachable for 30 seconds, the tunnel turns
+   itself off so your internet keeps working.
+5. **Repair button** — Settings → Repair network (and `FortiProxy.exe --repair`)
+   clears anything left behind at any time.
 
 ## Stack
 
-- **Client** — Go (`client/`), compiled to `fortiproxy-client.exe`
-- **Desktop app** — Python (CustomTkinter GUI, `app/`)
+- **Client + UI** — Go (`cmd/client`, webview), compiled to `FortiProxy.exe`
+- **Shared tunnel protocol** — `internal/tunnel`, `internal/proto`
 - **Server** — hosted at `proxy.zdstudios.network` (not in this repo; see `API.md`)
 
 ## Building from source
 
-A prebuilt `fortiproxy-client.exe` is already in the project root, so you can
-skip straight to step 3. To rebuild the client yourself you need **Python 3**,
-**Go 1.23+**, and a `secrets.env` file.
+You need **Go 1.23+** and a `secrets.env` file. On Windows:
 
 1. Copy `secrets.env.example` to `secrets.env` and set your `PROXY_TOKEN`
-   (this is baked into the client exe at build time and never committed).
-2. Build the Go tunnel client:
+   (baked into `FortiProxy.exe` at build time, never committed).
+2. Build:
    ```powershell
-   cd client
    .\build.ps1
    ```
-   This produces `fortiproxy-client.exe` in the project root.
-3. Build the Windows app (bundles the client exe):
-   ```
-   app\build.bat
-   ```
-   `FortiProxy.exe` lands in the project root.
-
-To run the app without building an exe (for development):
-```
-launch.bat
-```
-(Build the Go client first, or **Connect** won't work.)
+   This generates the admin manifest + icon and produces `FortiProxy.exe` in the
+   repo root, with the server URL, token and version baked in.
 
 ## Releasing a new version
 
-The version string lives in `docs/version.txt` (currently **V26**). A release has
-two halves, and **both** matter for the auto-updater (see below):
+The version lives in `docs/version.txt` (currently **V27**) and is baked into the
+exe at build time. A release has two halves, and **both** matter for the
+auto-updater (see below):
 
 1. **Build the zip** — on Windows:
    ```
    package.bat
    ```
-   Builds `FortiProxy.exe` (and the Go client) and produces
-   `FortiProxy-<version>.zip` (= `FortiProxy.exe` + `install.bat`), the file users
-   download and extract.
+   Builds `FortiProxy.exe` and produces `FortiProxy-<version>.zip`
+   (= `FortiProxy.exe` + `install.bat`), the file users download and extract.
 
 2. **Publish to GitHub** — on Windows:
    ```
@@ -111,10 +102,8 @@ two halves, and **both** matter for the auto-updater (see below):
    Clones the repo, syncs the code, **commits `FortiProxy-<version>.zip` to the
    repo root**, and pushes to `main` — preserving all history.
 
-To cut the version number up, edit `docs/version.txt` and bump `APP_VERSION` in
-`app/dashboard.py` to match, then repeat the two steps. `release.py` additionally
-publishes to the GitHub Releases page (needs `GITHUB_TOKEN`), but that's optional
-and separate from the auto-updater.
+To cut the version number up, edit only `docs/version.txt`, then repeat the two
+steps (the exe picks up the new number automatically).
 
 ## How auto-update works
 
@@ -122,7 +111,7 @@ The installed app checks for updates on launch:
 
 - It reads `docs/version.txt` from
   `raw.githubusercontent.com/.../main/docs/version.txt`. If that number is higher
-  than its own `APP_VERSION`, an update is available.
+  than the running build, it offers to update.
 - It downloads `raw.githubusercontent.com/.../main/FortiProxy-<version>.zip`,
   extracts it, and runs the bundled `install.bat`, which replaces the exe and
   relaunches.
@@ -140,6 +129,5 @@ app users run. Treat every published build as carrying that shared secret, as
 ## Secrets
 
 `secrets.env` and `API-KEYS.local.md` are git-ignored and must never be
-committed. The proxy token is at least 32 characters; the dashboard password is
-at least 8. To rotate them, update `secrets.env`, change the matching values on
-the server (Coolify), rebuild, and reinstall on every device.
+committed. To rotate the token, update `secrets.env`, change the matching value
+on the server (Coolify), rebuild, and reinstall.

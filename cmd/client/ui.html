@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FortiProxy</title>
+<style>
+:root {
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --radius: 8px;
+}
+/* Themes */
+[data-theme="midnight"] { color-scheme: dark; --bg:#14161a; --card:#1b1e23; --card2:#23272d; --line:#2e333b; --grid:#272b32; --text:#e8eaed; --muted:#a3a9b3; --faint:#858c97; --accent:#4f8ae0; --accent2:#4f8ae0; --on-accent:#fff; --good:#58b58a; --warn:#d6a24c; --bad:#e0726f; --track:#2b2f36; --knob:#f2f3f5; }
+[data-theme="aurora"] { color-scheme: dark; --bg:#131715; --card:#1a1f1c; --card2:#222825; --line:#2e3631; --grid:#272e2a; --text:#e7ebe8; --muted:#a2aca6; --faint:#848e88; --accent:#4c9f78; --accent2:#4c9f78; --on-accent:#fff; --good:#58b58a; --warn:#d6a24c; --bad:#e0726f; --track:#2b2f36; --knob:#f2f3f5; }
+[data-theme="ember"] { color-scheme: dark; --bg:#171412; --card:#1f1b18; --card2:#282320; --line:#37302b; --grid:#2e2925; --text:#ece8e4; --muted:#aea69f; --faint:#908880; --accent:#c9713a; --accent2:#c9713a; --on-accent:#fff; --good:#58b58a; --warn:#d6a24c; --bad:#e0726f; --track:#2b2f36; --knob:#f2f3f5; }
+[data-theme="graphite"] { color-scheme: dark; --bg:#121212; --card:#1a1a1a; --card2:#222222; --line:#303030; --grid:#282828; --text:#e8e8e8; --muted:#a6a6a6; --faint:#888888; --accent:#d4d4d4; --accent2:#d4d4d4; --on-accent:#141414; --good:#58b58a; --warn:#d6a24c; --bad:#e0726f; --track:#2b2f36; --knob:#f2f3f5; }
+[data-theme="daylight"] { color-scheme: light; --bg:#f5f5f4; --card:#fff; --card2:#f1f1ef; --line:#e2e2df; --grid:#ececea; --text:#1a1b1d; --muted:#5c5f66; --faint:#73767d; --accent:#2f6bc9; --accent2:#2f6bc9; --on-accent:#fff; --good:#1f7d55; --warn:#94610f; --bad:#bb3a3a; --track:#dcdcd9; --knob:#f2f3f5; }
+[data-theme="sakura"] { color-scheme: light; --bg:#f7f3f2; --card:#fff; --card2:#f3eeed; --line:#e6dedc; --grid:#efe9e7; --text:#231c1b; --muted:#6a5f5d; --faint:#7f7472; --accent:#b4536a; --accent2:#b4536a; --on-accent:#fff; --good:#1f7d55; --warn:#94610f; --bad:#bb3a3a; --track:#dcdcd9; --knob:#f2f3f5; }
+
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  display: flex; flex-direction: column; -webkit-user-select: none; user-select: none; transition: background .4s; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+header { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px 18px 6px; }
+header h1 { font-size: 16px; font-weight: 650; letter-spacing: -.01em; flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  background: var(--card); border: 1px solid var(--line); color: var(--muted); transition: color .3s; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+body.on .pill { color: var(--good); }
+body.busy .pill { color: var(--warn); }
+
+main { position: relative; flex: 1; min-height: 0; }
+.view { position: absolute; inset: 0; padding: 8px 18px 14px; overflow-y: auto; opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity .22s, transform .3s var(--ease), visibility .22s; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.view.active { opacity: 1; visibility: visible; transform: none; }
+/* Home never scrolls: fitHome() shrinks this if a window can't hold it all. */
+#homeView { overflow: hidden; }
+#homeFit { min-height: 100%; display: flex; flex-direction: column; justify-content: center; }
+
+/* Bottom navigation */
+nav { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 14px 12px; padding: 4px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.nav-glider { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 16px) / 3); border-radius: 5px; background: var(--card2);
+  transition: transform .35s var(--ease-spring); }
+nav button { position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 0; border-radius: 5px;
+  color: var(--muted); font-size: 13px; font-weight: 600; transition: color .2s; }
+nav button[aria-selected="true"] { color: var(--text); }
+nav svg { width: 16px; height: 16px; }
+.badge { min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; line-height: 17px; display: none; }
+.badge.show { display: inline-block; animation: pop .35s var(--ease-spring); }
+@keyframes pop { from { transform: scale(0); } }
+
+/* The toggle */
+.hero { display: flex; flex-direction: column; align-items: center; padding: 30px 0 20px; }
+.switch-wrap { position: relative; width: 296px; height: 132px; }
+#toggle { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 66px; padding: 0; overflow: hidden; background: var(--track); }
+#toggle:active .knob { width: 130px; }
+#toggle .fill { position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity .3s; }
+body.on #toggle .fill { opacity: 1; }
+.track-label { position: absolute; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 600; letter-spacing: .08em; transition: opacity .2s; }
+.track-label.l { left: 34px; color: var(--on-accent); opacity: 0; }
+.track-label.r { right: 34px; color: var(--muted); opacity: 1; }
+body.on .track-label.l { opacity: 1; }
+body.on .track-label.r, body.busy .track-label { opacity: 0; }
+.knob { position: absolute; top: 14px; left: 14px; width: 104px; height: 104px; border-radius: 52px; background: var(--knob); color: #6b7088;
+  display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  transition: transform .55s var(--ease-spring), width .18s var(--ease), color .3s; }
+body.busy .knob { transform: translateX(82px); }
+body.on .knob { transform: translateX(164px); color: #16a06c; }
+#toggle:active .knob { transition: transform .55s var(--ease-spring), width .18s; }
+body.on #toggle:active .knob { transform: translateX(138px); }
+.knob svg { position: absolute; width: 42px; height: 42px; transition: opacity .25s, transform .4s var(--ease-spring); }
+.knob .i-power { opacity: 1; }
+.knob .i-check { opacity: 0; transform: scale(.4) rotate(-30deg); }
+body.on .knob .i-power { opacity: 0; transform: scale(.4) rotate(30deg); }
+body.on .knob .i-check { opacity: 1; transform: none; }
+body.busy .knob .i-power { opacity: 0; }
+.spinner { position: absolute; width: 60px !important; height: 60px !important; opacity: 0; transition: opacity .2s; color: var(--accent); }
+body.busy .spinner { opacity: 1; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#title { margin-top: 26px; font-size: 26px; font-weight: 600; }
+#subtitle { min-height: 22px; color: var(--muted); font-size: 14.5px; text-align: center; }
+
+/* Banners */
+.banner { display: none; gap: 10px; align-items: flex-start; padding: 11px 12px; margin-bottom: 10px; border-radius: 6px; font-size: 13px;
+  border: 1px solid; animation: rise .35s var(--ease); -webkit-user-select: text; user-select: text; }
+.banner.show { display: flex; }
+.banner.bad { background: color-mix(in srgb, var(--bad) 13%, var(--card)); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.banner.info { background: color-mix(in srgb, var(--accent) 12%, var(--card)); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.banner svg { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+.banner.bad svg { color: var(--bad); }
+.banner .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.banner b { display: block; font-weight: 650; }
+.link { color: var(--text); font-weight: 650; font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+@keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
+
+/* Stats */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.stat { position: relative; padding: 11px 13px; overflow: hidden; }
+.stat small { display: block; color: var(--muted); font-size: 12px; }
+.stat strong { display: block; font-size: 24px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.stat strong span { font-size: 12px; font-weight: 550; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.stat svg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 34px; opacity: .55; }
+.stat.tall { min-height: 104px; }
+.mini { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; padding: 10px 0; }
+.mini div { text-align: center; }
+.mini div + div { border-left: 1px solid var(--line); }
+.mini small { display: block; color: var(--muted); font-size: 11.5px; }
+.mini b { font-size: 15.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 14px; border-radius: 6px; font-size: 14px; font-weight: 650;
+  background: var(--card2); border: 1px solid var(--line); transition: transform .15s, background .2s, opacity .2s; }
+.btn:hover { background: color-mix(in srgb, var(--accent) 16%, var(--card2)); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.small { padding: 5px 10px; font-size: 12px; border-radius: 9px; }
+.btn.wide { width: 100%; margin-top: 10px; }
+#testSheet { position: absolute; inset: 0; z-index: 3; display: none; align-items: flex-end; padding: 14px 18px; background: rgba(0,0,0,.45); }
+#testSheet.show { display: flex; animation: fade .2s; }
+@keyframes fade { from { opacity: 0; } }
+#testResult { width: 100%; padding: 14px 15px; box-shadow: 0 6px 18px rgba(0,0,0,.35); -webkit-user-select: text; user-select: text; }
+@keyframes sheet { from { transform: translateY(24px); opacity: 0; } }
+.verdict { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 6px; }
+.verdict svg { width: 18px; height: 18px; }
+.verdict.pass { color: var(--good); }
+.verdict.fail { color: var(--bad); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Logs */
+#logsView.active { display: flex; flex-direction: column; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.seg { position: relative; display: flex; flex: 1; padding: 3px; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 11px; }
+.seg button { flex: 1; padding: 5px 4px; border-radius: 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; transition: background .2s, color .2s; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+#logList { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; font: 12.5px/1.5 "Cascadia Mono", Consolas, monospace; -webkit-user-select: text; user-select: text;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.log { display: grid; grid-template-columns: 56px 1fr; gap: 8px; padding: 3px 6px; border-radius: 6px; animation: rise .25s var(--ease); }
+.log time { color: var(--muted); }
+.log span { overflow-wrap: anywhere; }
+.log.warn { background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.log.warn span::before { content: "! "; color: var(--warn); font-weight: 700; }
+.log.error { background: color-mix(in srgb, var(--bad) 15%, transparent); }
+.log.error span::before { content: "x "; color: var(--bad); font-weight: 700; }
+.empty { padding: 28px 12px; text-align: center; color: var(--muted); font-family: "Segoe UI", sans-serif; font-size: 13px; }
+
+/* Settings */
+section { margin-bottom: 18px; }
+h2 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 2px; }
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.swatch { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 2px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  background: var(--card); border: 1px solid var(--line); transition: transform .25s var(--ease-spring), border-color .2s, color .2s; }
+.swatch[aria-pressed="true"] { border-color: var(--accent); color: var(--text); }
+.swatch i { width: 34px; height: 16px; border-radius: 3px; display: block; }
+.row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row .text { flex: 1; min-width: 0; }
+.row b { display: block; font-weight: 600; font-size: 13.5px; }
+.row small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.tgl { flex: none; position: relative; width: 42px; height: 24px; border-radius: 12px; background: var(--track); box-shadow: inset 0 0 0 1px var(--line); transition: background .25s; }
+.tgl::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--knob); box-shadow: 0 1px 4px rgba(0,0,0,.35); transition: transform .35s var(--ease-spring); }
+.tgl[aria-checked="true"] { background: var(--accent); }
+.tgl[aria-checked="true"]::after { transform: translateX(18px); }
+.limit { padding: 11px 13px; }
+.limit + .limit { border-top: 1px solid var(--line); }
+.limit .top { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; margin-bottom: 8px; }
+.limit output { color: var(--accent); font-variant-numeric: tabular-nums; }
+[data-theme="graphite"] .limit output { color: var(--text); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--track); outline-offset: 5px; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 3px solid var(--knob); box-shadow: 0 1px 5px rgba(0,0,0,.4); transition: transform .2s var(--ease-spring); }
+input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
+.desc { padding: 0 13px 11px; color: var(--muted); font-size: 12px; }
+.seg-wrap { padding: 11px 13px 8px; }
+.about { font-size: 12px; color: var(--muted); padding: 0 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FortiProxy</h1>
+  <span class="pill" id="pill">Off</span>
+</header>
+
+<main>
+  <!-- Home -->
+  <div class="view active" id="homeView"><div id="homeFit">
+    <div class="banner bad" id="errBanner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9.5"/></svg>
+      <div class="grow"><b>Connection problem</b><span id="errText"></span></div>
+      <button class="link" id="errLogs">See logs</button>
+    </div>
+    <div class="banner info" id="staleBanner">
+      <div class="grow">Settings changed. Reconnect to use them.</div>
+      <button class="link" id="reconnect">Reconnect</button>
+    </div>
+
+    <div class="hero">
+      <div class="switch-wrap">
+                <button id="toggle" role="switch" aria-checked="false" aria-label="Proxy">
+          <span class="fill"></span>
+          <span class="track-label l">ON</span><span class="track-label r">OFF</span>
+          <span class="knob">
+            <svg class="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 3.5v8"/><path d="M6.7 6.7a7.5 7.5 0 1 0 10.6 0"/></svg>
+            <svg class="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.6 4.6L19 7.5"/></svg>
+            <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 0 1 9 9"/></svg>
+          </span>
+        </button>
+      </div>
+      <div id="title">Not connected</div>
+      <div id="subtitle">Your traffic is going out normally</div>
+    </div>
+
+    <div class="grid">
+      <div class="card stat tall"><small>Download</small><strong id="down">0<span>Mbps</span></strong><svg id="sparkDown" viewBox="0 0 100 34" preserveAspectRatio="none"></svg></div>
+      <div class="card stat tall"><small>Upload</small><strong id="up">0<span>Mbps</span></strong><svg id="sparkUp" viewBox="0 0 100 34" preserveAspectRatio="none"></svg></div>
+    </div>
+    <div class="card mini">
+      <div><small>Ping</small><b id="ping">–</b></div>
+      <div><small>Links</small><b id="links">–</b></div>
+      <div><small>Connected</small><b id="uptime">–</b></div>
+    </div>
+    <button class="btn wide" id="testBtn">Test connection</button>
+  </div></div>
+
+  <!-- Logs -->
+  <div class="view" id="logsView">
+    <div class="toolbar">
+      <div class="seg" id="logFilter">
+        <button data-f="all" aria-pressed="true">All</button>
+        <button data-f="warn" aria-pressed="false">Warnings</button>
+        <button data-f="error" aria-pressed="false">Errors</button>
+      </div>
+      <button class="btn small" id="copyLogs">Copy</button>
+      <button class="btn small" id="clearLogs">Clear</button>
+    </div>
+    <div class="card" id="logList" role="log"></div>
+  </div>
+
+  <!-- Settings -->
+  <div class="view" id="settingsView">
+    <section><h2>Theme</h2><div class="themes" id="themes"></div></section>
+
+    <section>
+      <h2>Bandwidth</h2>
+      <div class="card">
+        <div class="limit"><div class="top"><span>Download limit</span><output id="downOut"></output></div><input type="range" id="downLimit" min="0" max="8" step="1" aria-label="Download limit"></div>
+        <div class="limit"><div class="top"><span>Upload limit</span><output id="upOut"></output></div><input type="range" id="upLimit" min="0" max="8" step="1" aria-label="Upload limit"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Connection type</h2>
+      <div class="card">
+        <div class="seg-wrap"><div class="seg" id="links-seg">
+          <button data-v="1">Light</button><button data-v="2">Steady</button><button data-v="4">Balanced</button><button data-v="8">Turbo</button>
+        </div></div>
+        <div class="desc" id="linksDesc"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Network</h2>
+      <div class="card">
+        <div class="seg-wrap"><div class="seg" id="dns-seg">
+          <button data-v="1.1.1.1">Cloudflare</button><button data-v="8.8.8.8">Google</button><button data-v="9.9.9.9">Quad9</button>
+        </div></div>
+        <div class="desc">DNS provider, used for every lookup while connected.</div>
+        <div class="row"><div class="text"><b>Allow QUIC</b><small>Off is faster here, because browsers switch to TCP right away.</small></div><button class="tgl" role="switch" data-key="allowQuic" aria-label="Allow QUIC"></button></div>
+        <div class="row"><div class="text"><b>Block IPv6</b><small>Keep on unless your server has IPv6. Apps fall back to IPv4 instantly.</small></div><button class="tgl" role="switch" data-key="blockIpv6" aria-label="Block IPv6"></button></div>
+        <div class="row"><div class="text"><b>Connect on launch</b><small>Turn the proxy on as soon as the app opens.</small></div><button class="tgl" role="switch" data-key="autoConnect" aria-label="Connect on launch"></button></div>
+      </div>
+    </section>
+    <section>
+      <h2>Safety</h2>
+      <div class="card">
+        <div class="row"><div class="text"><b>Keep my internet working</b><small>If your server is gone for 30 seconds, turn the proxy off. With this off, traffic stays blocked until it returns.</small></div><button class="tgl" role="switch" data-key="failSafe" aria-label="Keep my internet working"></button></div>
+        <div class="row"><div class="text"><b>Repair network</b><small>Removes anything a crash left behind. It runs by itself after a crash, so you should rarely need this.</small></div><button class="btn small" id="repair">Repair</button></div>
+      </div>
+    </section>
+    <p class="about" id="about"></p>
+  </div>
+  <div id="testSheet"><div class="card" id="testResult"></div></div>
+</main>
+
+<nav role="tablist">
+  <span class="nav-glider" id="glider"></span>
+  <button role="tab" data-view="homeView" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 3.5v8"/><path d="M6.7 6.7a7.5 7.5 0 1 0 10.6 0"/></svg>Home</button>
+  <button role="tab" data-view="logsView" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>Logs<span class="badge" id="badge"></span></button>
+  <button role="tab" data-view="settingsView" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.2"/><circle cx="9" cy="16" r="2.2"/></svg>Settings</button>
+</nav>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids); return e; };
+
+const THEMES = [
+  ["midnight", "Midnight", "#4f8ae0", "#1b1e23"], ["aurora", "Forest", "#4c9f78", "#1a1f1c"],
+  ["ember", "Ember", "#c9713a", "#1f1b18"], ["graphite", "Graphite", "#a6a6a6", "#1a1a1a"],
+  ["daylight", "Daylight", "#2f6bc9", "#f5f5f4"], ["sakura", "Rose", "#b4536a", "#f7f3f2"],
+];
+const LIMITS = [0, 5, 10, 25, 50, 100, 250, 500, 1000];
+const LINK_TEXT = {
+  1: "Light: 1 link. Least overhead, but one lost packet briefly stalls everything.",
+  2: "Steady: 2 links. A good fit for slower or metered connections.",
+  4: "Balanced: 4 links. Recommended for everyday use.",
+  8: "Turbo: 8 links. Best for big downloads on a fast connection.",
+};
+const VIEWS = {
+  off:          ["Not connected", "Your traffic is going out normally", "Off"],
+  connecting:   ["Connecting", "", "Connecting"],
+  on:           ["Connected", "", "Connected"],
+  reconnecting: ["Reconnecting", "Traffic is held until the link returns", "Reconnecting"],
+  stopping:     ["Disconnecting", "Restoring your network", "Stopping"],
+};
+
+let settings = null, state = "off", prev = null, prevAt = 0, logSeq = 0, filter = "all", errorsUnseen = 0, tab = "homeView";
+let clickLock = 0, dismissedErr = "", logs = [], seenTest = null;
+const hist = { down: Array(60).fill(0), up: Array(60).fill(0) };
+
+function fmtRate(bytes, ms) {
+  const bits = bytes * 8 / (ms / 1000);
+  if (bits >= 1e9) return [(bits / 1e9).toFixed(2), "Gbps"];
+  if (bits >= 1e6) return [(bits / 1e6).toFixed(bits >= 1e8 ? 0 : 1), "Mbps"];
+  return [(bits / 1e3).toFixed(0), "Kbps"];
+}
+function fmtTime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60;
+  return h ? `${h}h ${m}m` : m ? `${m}m ${x}s` : `${x}s`;
+}
+function setStat(id, [v, unit]) { $(id).replaceChildren(v, el("span", { textContent: unit })); }
+
+function spark(id, data) {
+  const max = Math.max(1, ...data);
+  const pts = data.map((v, i) => `${(i / (data.length - 1) * 100).toFixed(1)},${(33 - v / max * 28).toFixed(1)}`);
+  $(id).innerHTML = `<polygon points="0,34 ${pts.join(" ")} 100,34" fill="var(--accent)" opacity=".28"/><polyline points="${pts.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+}
+
+function applyState(s) {
+  state = s.state;
+  const [title, sub, pill] = VIEWS[state] || VIEWS.off;
+  const busy = state === "connecting" || state === "reconnecting" || state === "stopping";
+  document.body.classList.toggle("on", state === "on");
+  document.body.classList.toggle("busy", busy);
+  $("toggle").setAttribute("aria-checked", state === "on");
+  $("title").textContent = title;
+  $("pill").textContent = pill;
+  $("subtitle").textContent = state === "connecting" ? (s.stage || "Starting") + "…"
+    : state === "on" ? `All traffic is going through ${s.server || "your server"}` : sub;
+}
+
+async function poll() {
+  try {
+    const s = await window.proxyStatus();
+    if (Date.now() > clickLock || s.state !== "off") applyState(s);
+    const now = performance.now();
+    const live = s.state === "on" || s.state === "reconnecting";
+    if (live && prev && now > prevAt) {
+      const d = Math.max(0, s.down - prev.down), u = Math.max(0, s.up - prev.up), ms = now - prevAt;
+      setStat("down", fmtRate(d, ms)); setStat("up", fmtRate(u, ms));
+      hist.down.push(d / ms); hist.down.shift(); hist.up.push(u / ms); hist.up.shift();
+      spark("sparkDown", hist.down); spark("sparkUp", hist.up);
+    } else if (!live) {
+      setStat("down", ["0", "Mbps"]); setStat("up", ["0", "Mbps"]);
+    }
+    prev = live ? s : null; prevAt = now;
+    $("ping").textContent = live && s.latencyMs ? s.latencyMs + " ms" : "–";
+    $("links").textContent = live ? `${s.links} of ${s.linksMax}` : "–";
+    $("uptime").textContent = s.uptime ? fmtTime(s.uptime) : "–";
+    $("staleBanner").classList.toggle("show", !!s.stale);
+    fitHome();
+    $("repair").disabled = !!s.repairing || s.state !== "off";
+    $("repair").textContent = s.repairing ? "Repairing…" : "Repair";
+    $("testBtn").disabled = !!s.testing || s.state !== "on";
+    $("testBtn").textContent = s.testing ? "Testing…" : "Test connection";
+    showError(s.error);
+    if (seenTest === null) seenTest = s.testSeq;
+    if (s.testSeq !== seenTest) { seenTest = s.testSeq; showTest(s.test); }
+    await pollLogs();
+    $("about").textContent = `${s.device} · Server: ${s.server}`;
+  } catch (err) {
+    // Never hide this. A silent failure here looks like a dead button.
+    showError("The app window lost contact with the proxy: " + (err && err.message || err));
+  }
+  setTimeout(poll, 500);
+}
+
+function showError(text) {
+  $("errBanner").classList.toggle("show", !!text && text !== dismissedErr);
+  if (text) $("errText").textContent = text;
+  fitHome();
+}
+
+// Keeps everything on Home visible at once. A banner, a very small screen or a
+// large system text size can't push anything out of reach.
+let lastFit = "", homeZoom = 1;
+function fitHome(force) {
+  const view = $("homeView"), box = $("homeFit");
+  const key = [view.clientHeight, $("errBanner").className, $("errText").textContent, $("staleBanner").className].join("|");
+  if (key === lastFit && !force) return;
+  lastFit = key;
+  box.style.zoom = 1;
+  box.style.minHeight = "0";
+  const style = getComputedStyle(view);
+  const room = view.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const need = box.getBoundingClientRect().height;
+  homeZoom = need > room ? Math.max(.55, room / need) : 1;
+  box.style.zoom = homeZoom;
+  box.style.minHeight = `${room / homeZoom}px`;
+}
+window.addEventListener("resize", () => fitHome(true));
+
+async function pollLogs() {
+  const list = await window.proxyLogs(logSeq);
+  if (!list || !list.length) return;
+  logSeq = list[list.length - 1].seq;
+  logs.push(...list);
+  if (logs.length > 1000) logs = logs.slice(-1000);
+  const bad = list.filter(e => e.level === "error").length;
+  if (bad && tab !== "logsView") { errorsUnseen += bad; $("badge").textContent = errorsUnseen; $("badge").classList.add("show"); }
+  const box = $("logList");
+  const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  list.filter(visible).forEach(e => box.append(logRow(e)));
+  syncLogEmpty();
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+const visible = e => filter === "all" || e.level === "error" || (filter === "warn" && e.level === "warn");
+const logRow = e => el("div", { className: "log " + e.level }, el("time", { textContent: e.time }), el("span", { textContent: e.text }));
+function syncLogEmpty() {
+  const box = $("logList"), row = box.querySelector(".empty");
+  const any = box.querySelector(".log");
+  if (any && row) row.remove();
+  if (!any && !row) box.append(el("div", { className: "empty", textContent: filter === "all" ? "Nothing logged yet." : "Nothing here, which is good news." }));
+}
+function redrawLogs() {
+  $("logList").replaceChildren(...logs.filter(visible).map(logRow));
+  syncLogEmpty();
+  $("logList").scrollTop = $("logList").scrollHeight;
+}
+
+function go(view) {
+  tab = view;
+  document.querySelectorAll("nav [role=tab]").forEach((b, i) => {
+    const on = b.dataset.view === view;
+    b.setAttribute("aria-selected", on);
+    if (on) $("glider").style.transform = `translateX(calc(${i * 100}% + ${i * 4}px))`;
+  });
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
+  if (view === "logsView") { errorsUnseen = 0; $("badge").classList.remove("show"); $("logList").scrollTop = $("logList").scrollHeight; }
+}
+document.querySelectorAll("nav [role=tab]").forEach(b => b.onclick = () => go(b.dataset.view));
+
+$("toggle").onclick = async () => {
+  if (Date.now() < clickLock) return;
+  clickLock = Date.now() + 900; // ignores a double click, which would cancel the start
+  if (state === "off") applyState({ state: "connecting", stage: "Starting" });
+  else if (state === "on") applyState({ state: "stopping" });
+  dismissedErr = "";
+  try { await window.proxyToggle(); } catch (err) { showError(String(err)); }
+};
+$("reconnect").onclick = () => window.proxyReconnect();
+$("errLogs").onclick = () => go("logsView");
+$("repair").onclick = () => { window.proxyRepair(); go("logsView"); };
+$("logFilter").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  filter = b.dataset.f;
+  [...$("logFilter").children].forEach(o => o.setAttribute("aria-pressed", o === b));
+  redrawLogs();
+};
+$("clearLogs").onclick = async () => { await window.proxyClearLogs(); logs = []; redrawLogs(); };
+$("copyLogs").onclick = () => {
+  const t = el("textarea", { value: logs.map(e => `${e.time} [${e.level}] ${e.text}`).join("\n") });
+  document.body.append(t); t.select(); document.execCommand("copy"); t.remove();
+  $("copyLogs").textContent = "Copied";
+  setTimeout(() => $("copyLogs").textContent = "Copy", 1200);
+};
+
+$("testBtn").onclick = () => { $("testSheet").classList.remove("show"); window.proxyStartTest(); };
+$("testSheet").onclick = () => $("testSheet").classList.remove("show");
+function showTest(r) {
+  const box = $("testResult");
+  const pass = r.ok;
+  const icon = pass ? '<path d="M5 12.5l4.6 4.6L19 7.5"/>' : '<path d="M6 6l12 12M18 6L6 18"/>';
+  const head = el("div", { className: "verdict " + (pass ? "pass" : "fail") });
+  head.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
+  head.append(pass ? "Traffic is leaving through your server" : (r.error || "The test failed"));
+  const rows = [["Exit IP", r.exitIp || "–"], ["DNS lookup", r.dnsMs ? r.dnsMs + " ms" : "–"], ["First response", r.firstMs ? r.firstMs + " ms" : "–"], ["Download", r.mbps ? r.mbps.toFixed(0) + " Mbps" : "Not measured"]];
+  const dl = el("dl", { className: "kv" });
+  rows.forEach(([k, v]) => dl.append(el("dt", { textContent: k }), el("dd", { textContent: v })));
+  const close = el("button", { className: "btn wide", textContent: "Close" });
+  box.replaceChildren(head, dl, close);
+  go("homeView");
+  $("testSheet").classList.add("show");
+}
+
+/* Settings */
+function save() { window.proxySaveSettings(settings).catch(err => showError("Couldn't save settings: " + err)); }
+function setTheme(name) {
+  document.documentElement.dataset.theme = name;
+  [...$("themes").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.t === name));
+}
+function nearestLimit(v) { const i = LIMITS.indexOf(v); return i < 0 ? 0 : i; }
+function limitLabel(i) { const v = LIMITS[i]; return !v ? "Unlimited" : v >= 1000 ? "1 Gbps" : v + " Mbps"; }
+function fillSlider(s) {
+  const pct = s.value / s.max * 100;
+  s.style.background = `linear-gradient(90deg, var(--accent) ${pct}%, var(--track) ${pct}%)`;
+}
+function bindSeg(id, key, cast, after) {
+  const seg = $(id);
+  const paint = () => [...seg.children].forEach(b => b.setAttribute("aria-pressed", cast(b.dataset.v) === settings[key]));
+  seg.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    settings[key] = cast(b.dataset.v); paint(); after && after(); save();
+  };
+  paint(); after && after();
+}
+function bindLimit(input, out, key) {
+  const paint = () => { out.textContent = limitLabel(+input.value); fillSlider(input); };
+  input.value = nearestLimit(settings[key]);
+  input.oninput = paint;
+  input.onchange = () => { settings[key] = LIMITS[+input.value]; save(); };
+  paint();
+}
+async function init() {
+  THEMES.forEach(([id, name, a, b]) => {
+    const dot = el("i"); dot.style.background = a; dot.style.outline = `1px solid ${b}`;
+    const btn = el("button", { className: "swatch" }, dot, name);
+    btn.dataset.t = id;
+    btn.onclick = () => { settings.theme = id; setTheme(id); save(); };
+    $("themes").append(btn);
+  });
+  settings = await window.proxySettings();
+  setTheme(settings.theme);
+  bindLimit($("downLimit"), $("downOut"), "downMbps");
+  bindLimit($("upLimit"), $("upOut"), "upMbps");
+  bindSeg("links-seg", "links", Number, () => $("linksDesc").textContent = LINK_TEXT[settings.links]);
+  bindSeg("dns-seg", "dns", String);
+  document.querySelectorAll(".tgl").forEach(t => {
+    const key = t.dataset.key;
+    t.setAttribute("aria-checked", !!settings[key]);
+    t.onclick = () => { settings[key] = !settings[key]; t.setAttribute("aria-checked", settings[key]); save(); };
+  });
+  spark("sparkDown", hist.down); spark("sparkUp", hist.up);
+  syncLogEmpty();
+  fitHome(true);
+  try { window.proxyViewport(innerWidth, innerHeight, devicePixelRatio, homeZoom); } catch {}
+  poll();
+}
+init().catch(err => showError("The app failed to start its interface: " + (err && err.message || err)));
+</script>
+</body>
+</html>

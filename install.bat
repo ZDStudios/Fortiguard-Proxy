@@ -26,12 +26,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Stop ANY running FortiProxy (downloaded or previously installed) so nothing stays
-:: locked. The quit signal lets a running copy clean up its tray icon first.
+:: Stop any running FortiProxy (the app and its crash watchdog are both this exe)
+:: so nothing stays locked.
 echo Stopping any running FortiProxy...
-echo quit > "%INSTALL_DIR%\.quit_signal"
-timeout /t 3 /nobreak >nul
-taskkill /IM fortiproxy-client.exe /F >nul 2>&1
 taskkill /IM FortiProxy.exe /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
@@ -47,9 +44,14 @@ del /F /Q "%STAGE_EXE%" >nul 2>&1
 :: Remove the "downloaded from the internet" mark so Windows doesn't restrict it.
 powershell -NoProfile -WindowStyle Hidden -Command "Unblock-File -Path '%INSTALL_DIR%\FortiProxy.exe'" >nul 2>&1
 
+:: Create a Start Menu shortcut so FortiProxy shows up in Windows Search.
+set "SM=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
+powershell -NoProfile -WindowStyle Hidden -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%SM%\FortiProxy.lnk'); $s.TargetPath='%INSTALL_DIR%\FortiProxy.exe'; $s.WorkingDirectory='%INSTALL_DIR%'; $s.Save()" >nul 2>&1
+
 :: Launch the INSTALLED copy. /D sets its working directory to %INSTALL_DIR% so it
 :: does NOT hold this download folder open (a process's working directory can't be
-:: deleted) — that was what left the folder "in use".
+:: deleted) — that was what left the folder "in use". FortiProxy asks for admin
+:: (it needs it to create the network adapter), so Windows may show a prompt.
 echo Launching FortiProxy...
 start "" /D "%INSTALL_DIR%" "%INSTALL_DIR%\FortiProxy.exe"
 

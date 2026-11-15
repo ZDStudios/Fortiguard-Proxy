@@ -44,10 +44,11 @@ git clone "%REPO%" "%WORK%"
 if %errorlevel% neq 0 ( echo [ERROR] Clone failed. & pause & exit /b 1 )
 
 :: Mirror the code into the clone. Exclude .git, build junk, secrets, the bare
-:: exes, and ALL zips -- excluding zips means the repo's existing release zips
-:: are preserved (not purged), and we add this version's zip explicitly below.
-robocopy "%SRC%." "%WORK%." /MIR /XD .git __pycache__ "%SRC%app\build" ^
-    /XF secrets.env fortiproxy-client.exe FortiProxy.exe FortiProxy-*.zip *.pyc >nul
+:: exe, the generated resource, and ALL zips -- excluding zips means the repo's
+:: existing release zips are preserved (not purged), and we add this version's
+:: zip explicitly below.
+robocopy "%SRC%." "%WORK%." /MIR /XD .git dist webview ^
+    /XF secrets.env FortiProxy.exe FortiProxy-*.zip rsrc_windows_amd64.syso rsrc.syso >nul
 if %errorlevel% geq 8 ( echo [ERROR] Copy failed. & pause & exit /b 1 )
 
 :: Put THIS version's zip in the repo root for the auto-updater.
