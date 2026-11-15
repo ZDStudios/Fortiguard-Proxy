@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- FortiProxy wall mark. Master source for icon.png. Fill = #1A6FE3 -->
+  <g fill="#1A6FE3">
+    <path d="M 84,92 H 164 V 176 H 32 V 144 A 52,52 0 0 1 84,92 Z"/>
+    <path d="M 196,92 H 316 V 176 H 196 Z"/>
+    <path d="M 348,92 H 428 A 52,52 0 0 1 480,144 V 176 H 348 Z"/>
+    <path d="M 32,204 H 164 V 320 H 32 Z"/>
+    <path d="M 348,204 H 480 V 320 H 348 Z"/>
+    <path d="M 32,348 H 164 V 432 H 84 A 52,52 0 0 1 32,380 Z"/>
+    <path d="M 196,348 H 316 V 432 H 196 Z"/>
+    <path d="M 348,348 H 480 V 380 A 52,52 0 0 1 428,432 H 348 Z"/>
+  </g>
+</svg>
