@@ -122,6 +122,8 @@ body.busy .spinner { opacity: 1; animation: spin .9s linear infinite; }
 .btn:active { transform: scale(.97); }
 .btn:disabled { opacity: .55; cursor: default; }
 .btn.small { padding: 5px 10px; font-size: 12px; border-radius: 9px; }
+.btn.danger { color: #e5484d; border-color: color-mix(in srgb, #e5484d 45%, var(--line)); }
+.btn.danger:hover { background: color-mix(in srgb, #e5484d 16%, var(--card2)); }
 .btn.wide { width: 100%; margin-top: 10px; }
 #testSheet { position: absolute; inset: 0; z-index: 3; display: none; align-items: flex-end; padding: 14px 18px; background: rgba(0,0,0,.45); }
 #testSheet.show { display: flex; animation: fade .2s; }
@@ -302,6 +304,12 @@ input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
       <div class="card">
         <div class="row"><div class="text"><b>Developer</b><small>ZD Studios</small></div></div>
         <div class="row"><div class="text"><b>Project &amp; source code</b><small>View the code, releases and report issues on GitHub.</small></div><button class="btn small" id="githubBtn">Open GitHub</button></div>
+      </div>
+    </section>
+    <section>
+      <h2>Uninstall</h2>
+      <div class="card">
+        <div class="row"><div class="text"><b>Remove FortiProxy</b><small>Turns the proxy off, then deletes the app, its settings, logs and shortcut. This can't be undone.</small></div><button class="btn small danger" id="uninstallBtn">Uninstall</button></div>
       </div>
     </section>
     <p class="about" id="about"></p>
@@ -592,6 +600,7 @@ async function init() {
   } catch {}
   $("githubBtn").onclick = () => window.proxyOpenRepo();
   $("checkUpdate").onclick = checkForUpdates;
+  $("uninstallBtn").onclick = () => window.proxyUninstall();
   bindLimit($("downLimit"), $("downOut"), "downMbps");
   bindLimit($("upLimit"), $("upOut"), "upMbps");
   bindSeg("links-seg", "links", Number, () => $("linksDesc").textContent = LINK_TEXT[settings.links]);

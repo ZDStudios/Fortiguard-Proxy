@@ -109,6 +109,7 @@ func main() {
 	w.Bind("proxyOpenRepo", func() { openURL(repoURL()) })
 	w.Bind("proxyCheckUpdate", func() UpdateCheck { return checkUpdate() })
 	w.Bind("proxyApplyUpdate", func() error { return applyUpdate(engine) })
+	w.Bind("proxyUninstall", func() { go uninstall(engine) })
 	w.Bind("proxyViewport", func(width, height int, scale float64, zoom float64) {
 		engine.Logs.Add("info", "Window ready: %dx%d, display scale %.2f, Home zoom %.2f", width, height, scale, zoom)
 	})
