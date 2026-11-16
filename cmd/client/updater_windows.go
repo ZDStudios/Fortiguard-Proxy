@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,6 +21,17 @@ import (
 // (e.g. "V28"). It is what the updater compares against the published version.
 var appVersion = "dev"
 
+// pendingVersion holds the newer version the launch check found, if any. The
+// window polls it (proxyPendingUpdate) and shows the update prompt.
+var (
+	pendingMu      sync.Mutex
+	pendingVersion string
+)
+
+func setPendingUpdate(v string) { pendingMu.Lock(); pendingVersion = v; pendingMu.Unlock() }
+
+func pendingUpdate() string { pendingMu.Lock(); defer pendingMu.Unlock(); return pendingVersion }
+
 const (
 	updateRepo = "ZDStudios/Fortiguard-Proxy"
 	developer  = "ZD Studios"
@@ -28,8 +40,14 @@ const (
 // The version file and the matching release zip both live in the repo root on
 // the main branch, served raw by GitHub — the same contract older installs use,
 // so every version can update to the next one.
-func repoURL() string    { return "https://github.com/" + updateRepo }
-func versionURL() string { return "https://raw.githubusercontent.com/" + updateRepo + "/main/docs/version.txt" }
+func repoURL() string { return "https://github.com/" + updateRepo }
+
+// versionURL carries a unique query each call so it defeats
+// raw.githubusercontent.com's ~5 minute CDN cache — an update is then seen as
+// soon as it is published, not up to 5 minutes later.
+func versionURL() string {
+	return fmt.Sprintf("https://raw.githubusercontent.com/%s/main/docs/version.txt?nocache=%d", updateRepo, time.Now().UnixNano())
+}
 func zipURL(v string) string {
 	return "https://raw.githubusercontent.com/" + updateRepo + "/main/FortiProxy-" + v + ".zip"
 }
@@ -51,7 +69,14 @@ type UpdateCheck struct {
 
 func fetchLatestVersion() (string, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(versionURL())
+	req, err := http.NewRequest("GET", versionURL(), nil)
+	if err != nil {
+		return "", err
+	}
+	// Belt and braces with the cache-busting query above.
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -90,8 +115,9 @@ func applyUpdate(engine *Engine) error {
 	return downloadAndInstall(engine, latest)
 }
 
-// checkForUpdate runs at launch: if a newer version exists it offers to install.
-// It never touches anything unless the published version is strictly newer.
+// checkForUpdate runs at launch: if a newer version is published it records it,
+// so the window can show the "update available" prompt. It changes nothing on
+// its own — the user decides from the prompt.
 func checkForUpdate(engine *Engine) {
 	defer func() { _ = recover() }()
 	latest, err := fetchLatestVersion()
@@ -99,17 +125,9 @@ func checkForUpdate(engine *Engine) {
 		engine.Logs.Add("info", "Update check skipped: %v", err)
 		return
 	}
-	if versionNum(latest) <= versionNum(appVersion) {
-		return
-	}
-	engine.Logs.Add("warn", "A new version is available: %s (you have %s)", latest, appVersion)
-	msg := fmt.Sprintf("A new version of FortiProxy (%s) is available.\n\nUpdate now? FortiProxy will close briefly and reopen.", latest)
-	if !askYesNo(msg) {
-		return
-	}
-	if err := downloadAndInstall(engine, latest); err != nil {
-		engine.Logs.Add("error", "Update failed: %v", err)
-		alert("The update couldn't be installed:\n" + err.Error())
+	if versionNum(latest) > versionNum(appVersion) {
+		engine.Logs.Add("warn", "A new version is available: %s (you have %s)", latest, appVersion)
+		setPendingUpdate(latest)
 	}
 }
 

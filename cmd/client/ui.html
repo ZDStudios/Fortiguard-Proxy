@@ -127,6 +127,12 @@ body.busy .spinner { opacity: 1; animation: spin .9s linear infinite; }
 .btn.wide { width: 100%; margin-top: 10px; }
 #testSheet { position: absolute; inset: 0; z-index: 3; display: none; align-items: flex-end; padding: 14px 18px; background: rgba(0,0,0,.45); }
 #testSheet.show { display: flex; animation: fade .2s; }
+#updateSheet { position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.5); }
+#updateSheet.show { display: flex; animation: fade .2s; }
+#updateSheet .card { max-width: 340px; }
+#updateSheet h3 { margin: 0 0 6px; font-size: 16px; }
+#updateSheet p { margin: 0 0 16px; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.update-actions { display: flex; gap: 8px; justify-content: flex-end; }
 @keyframes fade { from { opacity: 0; } }
 #testResult { width: 100%; padding: 14px 15px; box-shadow: 0 6px 18px rgba(0,0,0,.35); -webkit-user-select: text; user-select: text; }
 @keyframes sheet { from { transform: translateY(24px); opacity: 0; } }
@@ -315,6 +321,14 @@ input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
     <p class="about" id="about"></p>
   </div>
   <div id="testSheet"><div class="card" id="testResult"></div></div>
+  <div id="updateSheet"><div class="card">
+    <h3>Update available</h3>
+    <p id="updateMsg">There's a new update available. Would you like to update?</p>
+    <div class="update-actions">
+      <button class="btn small" id="updateCancel">Cancel</button>
+      <button class="btn small" id="updateGo">Update</button>
+    </div>
+  </div></div>
 </main>
 
 <nav role="tablist">
@@ -413,6 +427,7 @@ async function poll() {
     if (s.testSeq !== seenTest) { seenTest = s.testSeq; showTest(s.test); }
     await pollLogs();
     $("about").textContent = `${s.device} · Server: ${s.server}`;
+    try { const pu = await window.proxyPendingUpdate(); if (pu) showUpdatePrompt(pu); } catch {}
   } catch (err) {
     // Never hide this. A silent failure here looks like a dead button.
     showError("The app window lost contact with the proxy: " + (err && err.message || err));
@@ -584,6 +599,14 @@ function bindLimit(input, out, key) {
   input.onchange = () => { settings[key] = LIMITS[+input.value]; save(); };
   paint();
 }
+let updatePromptShown = false;
+function showUpdatePrompt(version) {
+  if (updatePromptShown) return;         // once per launch
+  updatePromptShown = true;
+  $("updateMsg").textContent = "There's a new update available (" + version + "). Would you like to update?";
+  $("updateSheet").classList.add("show");
+}
+
 async function init() {
   THEMES.forEach(([id, name, a, b]) => {
     const dot = el("i"); dot.style.background = a; dot.style.outline = `1px solid ${b}`;
@@ -601,6 +624,16 @@ async function init() {
   $("githubBtn").onclick = () => window.proxyOpenRepo();
   $("checkUpdate").onclick = checkForUpdates;
   $("uninstallBtn").onclick = () => window.proxyUninstall();
+  $("updateCancel").onclick = () => $("updateSheet").classList.remove("show");
+  $("updateGo").onclick = async () => {
+    $("updateGo").disabled = true; $("updateCancel").disabled = true;
+    $("updateMsg").textContent = "Downloading and installing the update… FortiProxy will reopen.";
+    try { await window.proxyApplyUpdate(); }
+    catch (e) {
+      $("updateMsg").textContent = "Update failed: " + e;
+      $("updateGo").disabled = false; $("updateCancel").disabled = false;
+    }
+  };
   bindLimit($("downLimit"), $("downOut"), "downMbps");
   bindLimit($("upLimit"), $("upOut"), "upMbps");
   bindSeg("links-seg", "links", Number, () => $("linksDesc").textContent = LINK_TEXT[settings.links]);
